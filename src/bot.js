@@ -205,6 +205,7 @@ export function buildBot(db, cfg) {
     } catch (e) {
       console.error("[panel] startup failed (does not affect relays):", e.message);
     }
+    startTelemetry(client, db, cfg); // admin abuse watcher
     setInterval(pollPending, cfg.verify_poll_seconds * 1000);
 
   });
