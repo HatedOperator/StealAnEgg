@@ -612,21 +612,25 @@ export function buildBot(db, cfg) {
             sections.push({ header: "LAST SEEN", entries: [header, ...entries] });
           }
         }
-        const body = sections
+        // one embed per rarity section, e.g. title "DIVINE LAST SEEN"
+        const sectionEmbeds = sections
           .filter((s) => s.entries.length)
-          .map((s) => `**${s.header}**\n${s.entries.join("\n")}`)
-          .join("\n\n")
-          .slice(0, 4000);
-        if (body) {
-          const b = new EmbedBuilder()
-            .setTitle("Last Seen")
-            .setColor(0x5865f2)
-            .setDescription(body)
-            .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
-            .setTimestamp();
+          .slice(0, 10)
+          .map((s) => {
+            const label = s.header.replace(/\s*[—-]\s*LAST SEEN/i, "").replace(/\s*LAST SEEN/i, "").trim();
+            const isRaritySection = /LAST SEEN/i.test(s.header);
+            const b = new EmbedBuilder()
+              .setTitle(isRaritySection ? `${label} LAST SEEN` : s.header)
+              .setColor(RARITY_COLORS[label.toLowerCase()] ?? 0x5865f2)
+              .setDescription(s.entries.join("\n").slice(0, 4000))
+              .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
+              .setTimestamp();
+            return b;
+          });
+        if (sectionEmbeds.length) {
           const media = collectComponentMedia(raw.components)[0];
-          if (media) b.setImage(media);
-          payload = { embeds: [b] };
+          if (media) sectionEmbeds[0].setImage(media);
+          payload = { embeds: sectionEmbeds };
         }
       } catch (e) {
         console.error("[mirror] raw component fetch failed:", e.message);
