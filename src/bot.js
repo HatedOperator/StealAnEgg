@@ -404,7 +404,6 @@ export function buildBot(db, cfg) {
         ? `https://www.roblox.com/games/start?placeId=${cfg.place_id || "PLACE"}&gameInstanceId=${jobId}`
         : null;
       const isLastSeen = type === "lastseen";
-      const hisImage = headerImage([...message.embeds.values()][0]);
       const embed = new EmbedBuilder()
         .setTitle(isLastSeen ? `LAST SEEN — ${spawn.rarity} ${spawn.egg}` : `${spawn.rarity} EGG IS LIVE — ${spawn.egg}`)
         .setColor(color)
@@ -416,7 +415,6 @@ export function buildBot(db, cfg) {
         .addFields(...(passthroughFields(message).length ? passthroughFields(message) : [{ name: "​", value: "​" }]))
         .setFooter({ text: isLastSeen ? "StealAnEgg · Last Seen Feed" : "StealAnEgg · Live Notifier" })
         .setTimestamp();
-      if (hisImage) embed.setThumbnail(hisImage);
       const roleId = isLastSeen ? 0 : (cfg.ping_roles || {})[spawn.rarity.toLowerCase()] || 0;
       await ch.send({ content: roleId ? `<@&${roleId}>` : "", embeds: [embed] });
     } catch (e) {
@@ -479,8 +477,10 @@ export function buildBot(db, cfg) {
                   .addFields(...(firstEmbed.fields ?? []).slice(0, 8).map((f) => ({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true })))
                   .setFooter({ text: `StealAnEgg · ${type === "lastseen" ? "Last Seen" : "Live"} Feed` })
                   .setTimestamp();
-                const img = headerImage(firstEmbed);
-                if (img) b.setThumbnail(img);
+                if (type === "lastseen") {
+                  const img = headerImage(firstEmbed);
+                  if (img) b.setThumbnail(img);
+                }
                 return b;
               })()],
             });
