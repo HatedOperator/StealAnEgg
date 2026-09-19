@@ -10,7 +10,7 @@ import {
   ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, SlashCommandBuilder,
   Events, ChannelType, PermissionFlagsBits, MessageFlags,
 } from "discord.js";
-import { parseBanners, parseFeedFormat } from "./banner.js";
+import { parseBanners, parseFeedFormat, RARITIES } from "./banner.js";
 import { nextReset, countdown, oddsText } from "./predictor.js";
 import { resolveUsername, getHeadshotUrl } from "./roblox.js";
 import { checkCodeRow, ingestSpawn, fanOut, VerificationError } from "./service.js";
@@ -488,7 +488,13 @@ export function buildBot(db, cfg) {
         try {
           const ch = outId && (await client.channels.fetch(String(outId)));
           if (ch) {
+            // ping the matching role even when the format went unparsed
+            const fbText = `${firstEmbed.title ?? ""} ${firstEmbed.description ?? ""}`
+              .replace(/<:([A-Za-z0-9_]+):\d+>/g, (_m, n) => ` ${n.replace(/_/g, " ")} `);
+            const fbRarity = [...RARITIES].reverse().find((r) => new RegExp(`\\b${r}\\b`, "i").test(fbText));
+            const fbRoleId = (cfg.ping_roles || {})[(fbRarity || "").toLowerCase()] || 0;
             await ch.send({
+              content: type === "lastseen" ? "" : fbRoleId ? `<@&${fbRoleId}>` : "",
               embeds: [(() => {
                 const b = new EmbedBuilder()
                   .setTitle(stripEmojis(firstEmbed.title) || "Feed update")
