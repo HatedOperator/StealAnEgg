@@ -7,6 +7,7 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "disc
 import { listServers } from "./roblox.js";
 
 const FOOTER = "Alydex Group's | Steal An Egg Events & Notifier API";
+const FOOTER_SAE = "Steal An Egg Events & Notifier API";
 const GAME_URL = (placeId) => `https://www.roblox.com/games/${placeId}/`;
 
 export function startTelemetry(client, db, cfg) {
@@ -142,7 +143,7 @@ export function startTelemetry(client, db, cfg) {
                 "• **Join before it ends**"
               : `It's over — the update is about to drop. Next abuse lands next Saturday, warning ping comes first.`
           )
-          .setFooter({ text: FOOTER })
+          .setFooter({ text: live ? FOOTER_SAE : FOOTER })
           .setTimestamp(),
       ],
       components: live
@@ -181,7 +182,7 @@ export function startTelemetry(client, db, cfg) {
               "Admin Abuse is happening **VERY SOON** in Steal an Egg.\n" +
               "Join up for chaos, special admin events, random rewards and things you normally won't see during regular gameplay."
             )
-            .setFooter({ text: FOOTER })
+            .setFooter({ text: FOOTER_SAE })
             .setTimestamp(),
         ],
         components: [
