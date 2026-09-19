@@ -4,7 +4,11 @@ const UA = { "User-Agent": "steal-an-egg-notifier/0.2 (community tool)" };
 export class RobloxError extends Error {}
 
 async function jfetch(url, opts = {}) {
-  const res = await fetch(url, { ...opts, headers: { ...UA, ...(opts.headers || {}) } });
+  const res = await fetch(url, {
+    ...opts,
+    signal: AbortSignal.timeout(8000), // never let a Roblox call hang a modal
+    headers: { ...UA, ...(opts.headers || {}) },
+  });
   if (res.status === 429) throw new RobloxError("Rate limited by Roblox — back off");
   if (!res.ok) throw new RobloxError(`${url} -> HTTP ${res.status}`);
   return res.json();

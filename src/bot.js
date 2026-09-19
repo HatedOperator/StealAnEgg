@@ -8,7 +8,7 @@
 import {
   Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder,
   ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, SlashCommandBuilder,
-  Events, ChannelType, PermissionFlagsBits,
+  Events, ChannelType, PermissionFlagsBits, MessageFlags,
 } from "discord.js";
 import { parseBanners } from "./banner.js";
 import { nextReset, countdown, oddsText } from "./predictor.js";
@@ -29,6 +29,9 @@ export function buildBot(db, cfg) {
   const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   });
+  // One bad interaction must never take the whole bot down.
+  client.on("error", (e) => console.error("[client]", e));
+  process.on("unhandledRejection", (e) => console.error("[unhandledRejection]", e));
 
   const commands = [
     new SlashCommandBuilder().setName("predict").setDescription("Next egg reset + rarity odds"),
@@ -189,7 +192,7 @@ export function buildBot(db, cfg) {
     } catch (e) {
       console.error("[bot] interaction error:", e);
       const reply = i.deferred || i.replied ? i.followUp.bind(i) : i.reply.bind(i);
-      await reply({ content: `❌ ${e.message || "Something went wrong."}`, ephemeral: true }).catch(() => {});
+      await reply({ content: `❌ ${e.message || "Something went wrong."}`, flags: MessageFlags.Ephemeral }).catch(() => {});
     }
   });
 
@@ -229,14 +232,14 @@ export function buildBot(db, cfg) {
     if (i.commandName === "panel") {
       db.setSetting("verify_panel_message_id", ""); // force repost
       await ensurePanel();
-      return i.reply({ content: "Panel refreshed ✅", ephemeral: true });
+      return i.reply({ content: "Panel refreshed ✅", flags: MessageFlags.Ephemeral });
     }
   }
 
   async function handleButton(i) {
     if (i.customId === ID.start) {
       if (db.getLink(i.user.id)) {
-        return i.reply({ content: "You're already verified ✅", ephemeral: true });
+        return i.reply({ content: "You're already verified ✅", flags: MessageFlags.Ephemeral });
       }
       const modal = new ModalBuilder()
         .setCustomId(ID.modal)
@@ -300,7 +303,7 @@ export function buildBot(db, cfg) {
   }
 
   async function handleModal(i) {
-    await i.deferReply({ ephemeral: true });
+    await i.deferReply({ flags: MessageFlags.Ephemeral });
     const username = i.fields.getTextInputValue("username").trim();
     const user = await resolveUsername(username); // throws if not found
     const code = db.createCode(i.user.id, user.name, user.id);
@@ -334,7 +337,7 @@ export function buildBot(db, cfg) {
     for (const att of message.attachments.values()) {
       if (!(att.contentType || "").startsWith("image/")) continue;
       try {
-        const res = await fetch(att.url);
+        const res = await fetch(att.url, { signal: AbortSignal.timeout(15000) });
         const buf = Buffer.from(await res.arrayBuffer());
         const text = await ocr.imageBufferToText(buf);
         for (const spawn of parseBanners(text)) {

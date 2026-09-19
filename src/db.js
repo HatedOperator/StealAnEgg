@@ -43,6 +43,17 @@ export class DB {
     this.conn = new DatabaseSync(dbPath);
     try { this.conn.exec("PRAGMA journal_mode = WAL"); } catch { /* fine */ }
     this.conn.exec(SCHEMA);
+    this.#migrate();
+  }
+
+  // Older databases (from the Python version) predate some columns —
+  // CREATE TABLE IF NOT EXISTS won't add them, so patch in place.
+  #migrate() {
+    const has = (table, col) =>
+      this.conn.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+    if (!has("codes", "roblox_user_id")) {
+      this.conn.exec("ALTER TABLE codes ADD COLUMN roblox_user_id INTEGER");
+    }
   }
 
   getSetting(key) {

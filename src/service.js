@@ -80,6 +80,7 @@ export async function fanOut(cfg, spawn, serverId, spotter, source) {
         footer: { text: "steal-an-egg notifier" },
       }],
     }),
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`webhook HTTP ${res.status}`);
 }
