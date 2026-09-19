@@ -19,6 +19,13 @@ export const DEFAULTS = {
     divine: "1550705206667382874",
     cosmic: "1550710049834537042",
   },
+  // -- Game --
+  place_id: 107778070777162,
+  notify_webhook_url: "", // webhook for egg pings from own sensors
+  // -- API --
+  api_host: "127.0.0.1",
+  api_port: 8720,
+  database_path: "eggwatch.db",
   // -- Predictor --
   cycle_seconds: 300,
   cycle_odds: { mythic: 0.2, secret: 0.01, eternal: 0.003, divine: 0.001, cosmic: 0.0002 },
