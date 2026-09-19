@@ -1,9 +1,14 @@
 // Member-side scanner (Windows): reads YOUR OWN screen while you play.
-//   node src/scanner.js
+//
+// Standalone (packaged zip): double-click "Start Scanner.bat" — first run asks
+// for your Roblox username once, then it just works. Minimize, don't close.
+// Dev: node src/scanner.js
 //
 // Pipeline: find Roblox window (PowerShell) → screenshot (screenshot-desktop)
 //           → crop banner strip (sharp) → OCR (tesseract.js) → parse → POST.
 // Server jobId comes from the client's launch args via CIM (passive OS read).
+import fs from "node:fs";
+import readline from "node:readline/promises";
 import { loadConfig } from "./config.js";
 import { parseBanners } from "./banner.js";
 import { imageBufferToText } from "./ocr.js";
@@ -83,9 +88,26 @@ async function report(cfg, spawn, jobId) {
 }
 
 async function main() {
-  const cfg = loadConfig();
+  // Packaged builds ship scanner-config.json (with the server URL); devs use config.json.
+  const file = fs.existsSync("scanner-config.json") ? "scanner-config.json" : "config.json";
+  const cfg = loadConfig(file);
+
+  // First run: ask for the username once and remember it.
+  if (!cfg.roblox_username) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const name = (
+      await rl.question("Type your Roblox username (this is how your catches get credited): ")
+    ).trim();
+    await rl.close();
+    if (!name) throw new Error("Username is required — run the scanner again.");
+    cfg.roblox_username = name;
+    fs.writeFileSync("scanner-config.json", JSON.stringify({ api_url: cfg.api_url, roblox_username: name }, null, 2));
+    console.log(`[scanner] saved — you won't be asked again`);
+  }
+
   if (!cfg.api_url) throw new Error("Set api_url (or EGW_API_URL) to your deployed API");
-  console.log("[scanner] watching for the Roblox window — play the game, this reads only your own screen");
+  console.log(`[scanner] credited as ${cfg.roblox_username} — watching for the Roblox window.`);
+  console.log("[scanner] play the game; this reads only your own screen. Minimize this window, don't close it.");
   for (;;) {
     try {
       const img = await grabBannerRegion();
