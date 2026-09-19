@@ -340,7 +340,60 @@ export function buildBot(db, cfg) {
 
   // ------------------------------------------- screenshot OCR fallback --
 
+  // ------------------------------------------------- inbox relay watcher --
+  // An external notifier bot (invited into OUR guild, or a webhook feed)
+  // posts its pings into a hidden inbox channel. We parse them and re-emit
+  // through our own ping pipeline, in our design. Bots ARE read here on
+  // purpose — the inbox exists to receive bot posts.
+  const JOIN_LINK_RE = /roblox\.com\/games\/start\?placeId=(\d+)&gameInstanceId=([\w-]+)/i;
+
+  const relayInbox = (message) => {
+    const embeds = [...message.embeds.values()];
+    // parse each source separately (concatenating lets egg names smear across fields)
+    const sources = [];
+    for (const e of embeds) {
+      sources.push(e.description ?? "");
+      for (const f of e.fields ?? []) sources.push(`${f.name} ${f.value}`);
+      sources.push(e.title ?? "");
+    }
+    sources.push(message.content ?? "");
+    const allText = sources.join(" ").replace(/\*/g, "");
+    const link = allText.match(JOIN_LINK_RE);
+    const jobId = link?.[2];
+
+    let relayed = 0;
+    for (const src of sources) {
+      const text = src.replace(/\*/g, "");
+      for (const spawn of parseBanners(text)) {
+        const rowId = ingestSpawn(db, cfg, spawn, {
+          server_id: jobId ?? null,
+          source: "relay",
+          spotter: message.author.username || "feed",
+          fanoutFn: fanOut,
+        });
+        if (rowId !== null) {
+          relayed++;
+          console.log(`[relay] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
+        }
+      }
+      if (relayed) break; // first source that parses cleanly is the canonical one
+    }
+    if (!relayed) {
+      console.log("[relay] inbox post had no parseable spawn:", allText.slice(0, 80));
+    }
+  };
+
   client.on(Events.MessageCreate, async (message) => {
+    // relay path first: inbox may contain bot posts
+    if (cfg.inbox_channel_id && message.channel.id === String(cfg.inbox_channel_id)) {
+      try {
+        relayInbox(message);
+      } catch (e) {
+        console.error("[relay] failed:", e.message);
+      }
+      return;
+    }
+
     if (message.author.bot) return;
     if (!cfg.screenshot_channel_id || message.channel.id !== String(cfg.screenshot_channel_id)) return;
     for (const att of message.attachments.values()) {

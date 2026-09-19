@@ -10,9 +10,9 @@ export const RARITY_ORDER = Object.fromEntries(RARITIES.map((r, i) => [r.toLower
 
 const BANNER_RE = new RegExp(
   `\\b(?<rarity>${RARITIES.join("|")})\\s+` +
-  `(?<egg>[A-Za-z0-9][A-Za-z0-9'’\\- ]*?)\\s+` +
+  `(?<egg>[A-Za-z0-9][A-Za-z0-9'’&\\- ]*?)\\s+` +
   `egg\\s+spawned\\s+in\\s+` +
-  `(?<biome>[A-Za-z][A-Za-z0-9'’\\- ]*)`,
+  `(?<biome>[A-Za-z][A-Za-z0-9'’&\\- ]*)`,
   "gi"
 );
 

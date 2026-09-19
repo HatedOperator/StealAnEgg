@@ -51,7 +51,9 @@ export function ingestSpawn(db, cfg, spawn, { server_id = null, source, spotter 
 
   if (rarityAtLeast(spawn.rarity, cfg.min_rarity_to_ping)) {
     try {
-      fanoutFn(cfg, spawn, server_id, spotter, source);
+      Promise.resolve(fanoutFn(cfg, spawn, server_id, spotter, source)).catch((e) =>
+        console.error("[fanout] failed:", e.message)
+      );
     } catch (e) {
       console.error("[fanout] failed:", e.message);
     }
