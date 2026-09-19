@@ -509,23 +509,42 @@ export function buildBot(db, cfg) {
         .setTimestamp();
       const img = headerImage(e);
       if (img) b.setThumbnail(img);
+      if (e.image?.url) b.setImage(e.image.url);
       return b;
     });
+
+    // image-only boards: his bot posts a generated PNG with no embed/text
+    const images = [...message.attachments.values()].filter((a) => (a.contentType ?? "").startsWith("image/"));
+    if (!restyled.length && images.length) {
+      return {
+        embeds: [new EmbedBuilder()
+          .setTitle("Last Seen")
+          .setColor(0x5865f2)
+          .setImage(images[0].url)
+          .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+          .setTimestamp()],
+      };
+    }
+
     if (restyled.length) return { embeds: restyled };
     const text = stripEmojis(message.content);
     return text
       ? { embeds: [new EmbedBuilder().setTitle("Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "StealAnEgg · Last Seen Feed" }).setTimestamp()] }
       : null;
-  };
+  };;
 
   const mirrorBoard = async (message) => {
     const outId = cfg.lastseen_output_channel_id;
     if (!outId) return;
     const payload = mirrorPayload(message);
-    if (!payload) return;
-    const hash = JSON.stringify(payload).length + ":" + payload.embeds.map((e) => e.data.description?.length ?? 0).join(",");
-    if (mirrorHashes.get(message.id) === hash) return; // nothing changed
-    mirrorHashes.set(message.id, hash);
+    if (!payload) {
+      const atts = [...message.attachments.values()];
+      console.log(`[mirror] no mirrorable content on ${message.id} (embeds=${message.embeds?.size ?? 0}, attachments=${atts.length})`);
+      return;
+    }
+    const snapshot = JSON.stringify(payload.embeds.map((e) => e.data));
+    if (mirrorHashes.get(message.id) === snapshot) return; // nothing changed
+    mirrorHashes.set(message.id, snapshot);
 
     const ch = await client.channels.fetch(String(outId));
     if (!ch) return;
