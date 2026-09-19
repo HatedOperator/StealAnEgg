@@ -185,6 +185,7 @@ export function buildBot(db, cfg) {
   });
 
   client.on(Events.InteractionCreate, async (i) => {
+    console.log(`[interaction] ${i.user.tag} -> ${i.isChatInputCommand() ? "/" + i.commandName : i.customId}`);
     try {
       if (i.isChatInputCommand()) return handleCommand(i);
       if (i.isButton()) return handleButton(i);
