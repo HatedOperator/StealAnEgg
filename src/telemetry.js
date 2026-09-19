@@ -135,7 +135,7 @@ export function startTelemetry(client, db, cfg) {
       components: live
         ? [
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setURL(join).setLabel("JOIN GAME").setStyle(ButtonStyle.Danger)
+              new ButtonBuilder().setURL(join).setLabel("JOIN ADMIN ABUSE!").setStyle(ButtonStyle.Danger)
             ),
           ]
         : [],
@@ -174,7 +174,7 @@ export function startTelemetry(client, db, cfg) {
         ],
         components: [
           new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setURL(GAME_URL(cfg.place_id)).setLabel("JOIN GAME").setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setURL(GAME_URL(cfg.place_id)).setLabel("JOIN ADMIN ABUSE!").setStyle(ButtonStyle.Danger)
           ),
         ],
       });
