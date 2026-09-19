@@ -1,19 +1,12 @@
-# secrets / local config — configure hosts via EGW_* env vars instead
 config.json
 .env
-
-# local state
 *.db
 *.db-wal
 *.db-shm
-
-# python
+node_modules/
 __pycache__/
 *.pyc
 .venv/
-venv/
-
-# packaging
 build/
 dist/
 *.spec

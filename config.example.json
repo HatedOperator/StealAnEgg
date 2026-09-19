@@ -1,11 +1,12 @@
 {
   "bot_token": "YOUR_DISCORD_BOT_TOKEN",
-  "guild_id": 123456789012345678,
-  "verified_role_id": 123456789012345678,
-  "screenshot_channel_id": 123456789012345678,
+  "guild_id": 1544149511436509336,
+  "verified_role_id": 1544186196253609984,
+  "verify_channel_id": "1550689778717036554",
+  "screenshot_channel_id": 1544152945644273774,
   "notify_webhook_url": "https://discord.com/api/webhooks/...",
 
-  "place_id": 0000000000,
+  "place_id": 107778070777162,
 
   "api_host": "127.0.0.1",
   "api_port": 8720,
@@ -21,14 +22,15 @@
 
   "cycle_seconds": 300,
   "cycle_odds": {
-    "mythic": 0.20,
+    "mythic": 0.2,
     "secret": 0.01,
     "eternal": 0.003,
     "divine": 0.001,
     "cosmic": 0.0002
   },
 
-  "tesseract_cmd": "C:/Program Files/Tesseract-OCR/tesseract.exe",
+  "verify_code_ttl_minutes": 30,
+  "verify_poll_seconds": 15,
 
   "api_url": "http://127.0.0.1:8720",
   "roblox_username": "YourRobloxName"
