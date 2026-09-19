@@ -25,7 +25,11 @@ export const DEFAULTS = {
   database_path: "eggwatch.db",
   // -- Pings --
   min_rarity_to_ping: "Eternal",
-  ping_roles: { eternal: 0, divine: 0, cosmic: 0, secret: 0 },
+  ping_roles: {
+    secret: "1550705211381653524",
+    eternal: "1550705207149731963",
+    divine: "1550705206667382874",
+  },
   // -- Predictor --
   cycle_seconds: 300,
   cycle_odds: { mythic: 0.2, secret: 0.01, eternal: 0.003, divine: 0.001, cosmic: 0.0002 },

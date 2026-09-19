@@ -19,10 +19,9 @@
 
   "min_rarity_to_ping": "Eternal",
   "ping_roles": {
-    "secret": 0,
-    "eternal": 123456789012345678,
-    "divine": 123456789012345678,
-    "cosmic": 123456789012345678
+    "secret": "1550705211381653524",
+    "eternal": "1550705207149731963",
+    "divine": "1550705206667382874"
   },
 
   "cycle_seconds": 300,
