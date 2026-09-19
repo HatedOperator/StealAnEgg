@@ -350,6 +350,15 @@ export function buildBot(db, cfg) {
   // output channel. Bots ARE read here on purpose — inboxes receive bot posts.
   const JOIN_LINK_RE = /roblox\.com\/games\/start\?placeId=(\d+)&gameInstanceId=([\w-]+)/i;
 
+  const stripEmojis = (t) =>
+    (t ?? "")
+      .replace(/<:[A-Za-z0-9_]+:\d+>/g, "")                          // custom discord emojis
+      .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "") // unicode emojis
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
+
+  const headerImage = (e) => e?.thumbnail?.url || e?.image?.url || null;
+
   const RARITY_COLORS = {
     common: 0x99aab5, uncommon: 0x57f287, rare: 0x3498db, epic: 0x9b59b6,
     legendary: 0xf1c40f, mythic: 0xe67e22, secret: 0x2b2d31, eternal: 0xe91e8c,
@@ -374,7 +383,7 @@ export function buildBot(db, cfg) {
     for (const e of [...message.embeds.values()]) {
       for (const f of e.fields ?? []) {
         if (KNOWN.test(f.name)) continue;
-        out.push({ name: f.name, value: f.value, inline: f.inline ?? true });
+        out.push({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true });
       }
     }
     return out.slice(0, 8);
@@ -391,17 +400,19 @@ export function buildBot(db, cfg) {
         ? `https://www.roblox.com/games/start?placeId=${cfg.place_id || "PLACE"}&gameInstanceId=${jobId}`
         : null;
       const isLastSeen = type === "lastseen";
+      const hisImage = headerImage([...message.embeds.values()][0]);
       const embed = new EmbedBuilder()
-        .setTitle(isLastSeen ? `👀 LAST SEEN — ${spawn.rarity} ${spawn.egg}` : `🥚 ${spawn.rarity} EGG IS LIVE — ${spawn.egg}`)
+        .setTitle(isLastSeen ? `LAST SEEN — ${spawn.rarity} ${spawn.egg}` : `${spawn.rarity} EGG IS LIVE — ${spawn.egg}`)
         .setColor(color)
         .setDescription(
           `**${spawn.rarity} ${spawn.egg} Egg** — **${spawn.biome}**
 ` +
-          (join ? `> 🔗 [**CLICK TO JOIN THE SERVER**](${join})` : "")
+          (join ? `> [**CLICK TO JOIN THE SERVER**](${join})` : "")
         )
         .addFields(...(passthroughFields(message).length ? passthroughFields(message) : [{ name: "​", value: "​" }]))
         .setFooter({ text: isLastSeen ? "StealAnEgg · Last Seen Feed" : "StealAnEgg · Live Notifier" })
         .setTimestamp();
+      if (hisImage) embed.setThumbnail(hisImage);
       const roleId = isLastSeen ? 0 : (cfg.ping_roles || {})[spawn.rarity.toLowerCase()] || 0;
       await ch.send({ content: roleId ? `<@&${roleId}>` : "", embeds: [embed] });
     } catch (e) {
@@ -456,13 +467,18 @@ export function buildBot(db, cfg) {
           const ch = outId && (await client.channels.fetch(String(outId)));
           if (ch) {
             await ch.send({
-              embeds: [new EmbedBuilder()
-                .setTitle(firstEmbed.title ?? "Feed update")
-                .setColor(type === "lastseen" ? 0x5865f2 : 0x9b59b6)
-                .setDescription(firstEmbed.description ?? "")
-                .addFields(...(firstEmbed.fields ?? []).slice(0, 8).map((f) => ({ name: f.name, value: f.value, inline: f.inline ?? true })))
-                .setFooter({ text: `StealAnEgg · ${type === "lastseen" ? "Last Seen" : "Live"} Feed` })
-                .setTimestamp()],
+              embeds: [(() => {
+                const b = new EmbedBuilder()
+                  .setTitle(stripEmojis(firstEmbed.title) || "Feed update")
+                  .setColor(type === "lastseen" ? 0x5865f2 : 0x9b59b6)
+                  .setDescription(stripEmojis(firstEmbed.description))
+                  .addFields(...(firstEmbed.fields ?? []).slice(0, 8).map((f) => ({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true })))
+                  .setFooter({ text: `StealAnEgg · ${type === "lastseen" ? "Last Seen" : "Live"} Feed` })
+                  .setTimestamp();
+                const img = headerImage(firstEmbed);
+                if (img) b.setThumbnail(img);
+                return b;
+              })()],
             });
           }
         } catch (e) {
@@ -479,19 +495,22 @@ export function buildBot(db, cfg) {
 
   const mirrorPayload = (message) => {
     const embeds = [...message.embeds.values()];
-    const restyled = embeds.map((e) =>
-      new EmbedBuilder()
-        .setTitle(e.title ?? "Last Seen")
+    const restyled = embeds.map((e) => {
+      const b = new EmbedBuilder()
+        .setTitle(stripEmojis(e.title) || "Last Seen")
         .setColor(0x5865f2)
-        .setDescription(e.description ?? "")
-        .addFields(...(e.fields ?? []).slice(0, 8).map((f) => ({ name: f.name, value: f.value, inline: f.inline ?? true })))
+        .setDescription(stripEmojis(e.description))
+        .addFields(...(e.fields ?? []).slice(0, 8).map((f) => ({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true })))
         .setFooter({ text: "StealAnEgg · Last Seen Feed" })
-        .setTimestamp()
-    );
+        .setTimestamp();
+      const img = headerImage(e);
+      if (img) b.setThumbnail(img);
+      return b;
+    });
     if (restyled.length) return { embeds: restyled };
-    const text = (message.content ?? "").trim();
+    const text = stripEmojis(message.content);
     return text
-      ? { embeds: [new EmbedBuilder().setTitle("👀 Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "StealAnEgg · Last Seen Feed" }).setTimestamp()] }
+      ? { embeds: [new EmbedBuilder().setTitle("Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "StealAnEgg · Last Seen Feed" }).setTimestamp()] }
       : null;
   };
 
