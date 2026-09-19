@@ -120,10 +120,11 @@ export function startTelemetry(client, db, cfg) {
           .setColor(live ? 0xed4245 : 0x99aab5)
           .setDescription(
             live
-              ? "The devs are in the servers. Free spawns, boosted drops, rare eggs raining — total chaos until they get bored.\n" +
-                "Load in before the good stuff is gone.\n\n" +
+              ? "**FREE RARE EGGS + SPEED BOOSTS ACTIVE**\n" +
+                "everyone is farming RIGHT NOW\n" +
+                "GO GO GO — don't get left out\n\n" +
                 `> [**CLICK TO JOIN THE GAME**](${join})`
-              : `Activity is back to normal. Next one should land next Saturday — the pre-event warning will ping first.`
+              : `It's over — the update is about to drop. Next abuse lands next Saturday, warning ping comes first.`
           )
           .setFooter({ text: FOOTER })
           .setTimestamp(),
