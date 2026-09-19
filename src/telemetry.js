@@ -116,14 +116,14 @@ export function startTelemetry(client, db, cfg) {
       content: live && roleId ? `<@&${roleId}>` : "",
       embeds: [
         new EmbedBuilder()
-          .setTitle(live ? "ADMIN ABUSE IS LIVE" : "Admin Abuse has ended")
+          .setTitle(live ? "ADMIN ABUSE NOW" : "Admin Abuse has ended")
           .setColor(live ? 0xed4245 : 0x99aab5)
           .setDescription(
             live
-              ? `Player count just jumped **${Math.round((players / median) * 100 - 100)}%** above normal ` +
-                `(${players.toLocaleString("en-US")} playing right now).\n` +
-                `> [**CLICK TO JOIN THE ACTION**](${join})`
-              : `Activity is back to normal (${players.toLocaleString("en-US")} playing).`
+              ? "The devs are in the servers. Free spawns, boosted drops, rare eggs raining — total chaos until they get bored.\n" +
+                "Load in before the good stuff is gone.\n\n" +
+                `> [**CLICK TO JOIN THE GAME**](${join})`
+              : `Activity is back to normal. Next one should land next Saturday — the pre-event warning will ping first.`
           )
           .setFooter({ text: FOOTER })
           .setTimestamp(),
