@@ -598,6 +598,9 @@ export function buildBot(db, cfg) {
       try {
         const raw = await client.rest.get(`/channels/${message.channelId}/messages/${message.id}`);
         const texts = collectComponentText(raw.components);
+        // his footer carries the real "Updated <t:..:R>" stamp — use it for ours
+        const updatedTs = texts.join("\n").match(/Updated <t:(\d+):R>/i)?.[1]
+          ?? Math.floor(Date.now() / 1000);
         // rebuild his layout cleanly: bold rarity section headers, one egg per
         // line as "Name — time (· biome)", live <t:..:R> timestamps kept
         const sections = [];
@@ -637,6 +640,10 @@ export function buildBot(db, cfg) {
         if (sectionEmbeds.length) {
           const media = collectComponentMedia(raw.components)[0];
           if (media) sectionEmbeds[0].setImage(media);
+          // live-ticking freshness line at the bottom of the board (footers are
+          // plain text and can't render timestamps)
+          const last = sectionEmbeds[sectionEmbeds.length - 1];
+          last.data.description = `${last.data.description}\n\nLAST UPDATED <t:${updatedTs}:R>`.slice(0, 4000);
           payload = { embeds: sectionEmbeds };
         }
       } catch (e) {
