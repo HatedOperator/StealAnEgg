@@ -29,6 +29,7 @@ export const DEFAULTS = {
     secret: "1550705211381653524",
     eternal: "1550705207149731963",
     divine: "1550705206667382874",
+    cosmic: "1550710049834537042",
   },
   // -- Predictor --
   cycle_seconds: 300,
