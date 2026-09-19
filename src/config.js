@@ -10,19 +10,6 @@ export const DEFAULTS = {
   verified_role_id: 0,
   verify_channel_id: "1550689778717036554", // verification panel lives here
   announce_channel_id: "1550697264970862673", // ✅ verified announcements go here
-  // relay: feeds land in a second guild's inboxes, we re-emit into main outputs
-  inbox_channel_id: "1550762266406686720",           // notifier feed inbox (guild 2)
-  notifier_output_channel_id: "1550426915200966657",
-  lastseen_channel_id: "1550762296756670546",        // last-seen feed inbox (guild 2)
-  lastseen_output_channel_id: "1550427008130088960",
-  screenshot_channel_id: 0,
-  notify_webhook_url: "",
-  // -- Game --
-  place_id: 0,
-  // -- API --
-  api_host: "127.0.0.1",
-  api_port: 8720,
-  database_path: "eggwatch.db",
   // -- Pings --
   min_rarity_to_ping: "Eternal",
   ping_roles: {
