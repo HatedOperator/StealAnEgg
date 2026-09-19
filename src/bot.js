@@ -495,7 +495,8 @@ export function buildBot(db, cfg) {
   // ------------------------------------------------- last-seen board mirror --
   // His last-seen bot keeps ONE message and edits it forever (never resends).
   // We keep our own message in the output channel and edit it in sync.
-  const mirrorHashes = new Map(); // their message id -> last content hash
+  const mirrorHashes = new Map(); // their message id -> last content snapshot
+  let lastSeenScans = 0;
 
   const mirrorPayload = (message) => {
     const embeds = [...message.embeds.values()];
@@ -552,13 +553,14 @@ export function buildBot(db, cfg) {
     if (mineId) {
       try {
         const mine = await ch.messages.fetch(mineId);
+        console.log("[mirror] detected changes, editing last seen message");
         await mine.edit(payload);
         return;
       } catch { /* deleted — resend below */ }
     }
+    console.log("[mirror] sending updated last seen");
     const sent = await ch.send(payload);
     db.setSetting(`lastseen_mirror_${message.id}`, sent.id);
-    console.log(`[mirror] board ${message.id} -> ${sent.id} created`);
   };
 
   // Poll the last-seen inbox: his board is one message edited forever, so
@@ -566,7 +568,7 @@ export function buildBot(db, cfg) {
   const pollLastSeen = async () => {
     try {
       if (!cfg.lastseen_channel_id) return console.log("[mirror] poll skipped: no lastseen_channel_id");
-      console.log(`[mirror] poll: scanning ${cfg.lastseen_channel_id}`);
+      console.log(lastSeenScans++ === 0 ? "[mirror] scanning last seen" : "[mirror] rescanning last seen");
       const ch = await client.channels.fetch(String(cfg.lastseen_channel_id));
       if (!ch) return console.log("[mirror] poll: channel fetch returned null");
       if (!ch.messages) return console.log(`[mirror] poll: channel type ${ch.type} has no messages API`);
