@@ -143,6 +143,21 @@ export function buildBot(db, cfg) {
 
   // -------------------------------------------------------------- panel --
 
+  const verificationModal = () =>
+    new ModalBuilder()
+      .setCustomId(ID.modal)
+      .setTitle("Roblox Verification")
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("username")
+            .setLabel("Your exact Roblox username")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(20)
+        )
+      );
+
   const panelPayload = () => ({
     embeds: [
       new EmbedBuilder()
@@ -248,20 +263,7 @@ export function buildBot(db, cfg) {
       if (db.getLink(i.user.id)) {
         return i.reply({ content: "You're already verified ✅", flags: MessageFlags.Ephemeral });
       }
-      const modal = new ModalBuilder()
-        .setCustomId(ID.modal)
-        .setTitle("Roblox Verification")
-        .addComponents(
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("username")
-              .setLabel("Your exact Roblox username")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
-              .setMaxLength(20)
-          )
-        );
-      return i.showModal(modal);
+      return i.showModal(verificationModal());
     }
 
     if (i.customId === ID.yes) {
@@ -278,10 +280,8 @@ export function buildBot(db, cfg) {
     }
 
     if (i.customId === ID.no) {
-      return i.update({
-        content: "No problem — hit **Verify Me** again with the correct username.",
-        embeds: [], components: [],
-      });
+      // Reopen the username popup directly instead of sending them back to the panel.
+      return i.showModal(verificationModal());
     }
 
     if (i.customId === ID.done) {
