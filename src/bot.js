@@ -405,7 +405,7 @@ export function buildBot(db, cfg) {
     }
   };
 
-  const relayInbox = async (message, type) => {
+  const relayInbox = async (message, type, { silent = false } = {}) => {
     const sources = collectEmbedTexts(message);
     const allText = sources.join(" ").replace(/\*/g, "");
     const jobId = allText.match(JOIN_LINK_RE)?.[2];
@@ -425,7 +425,7 @@ export function buildBot(db, cfg) {
         if (rowId !== null) {
           relayed++;
           console.log(`[relay:${type}] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
-          await postOurs(message, type, spawn, jobId);
+          if (!silent) await postOurs(message, type, spawn, jobId);
         }
       }
       if (parsedAny) break; // first source that parses cleanly is the canonical one
@@ -436,6 +436,7 @@ export function buildBot(db, cfg) {
     }
     if (!parsedAny) {
       // Unknown format: still relay like-for-like (re-styled) so nothing is lost.
+      if (silent) return;
       console.log(`[relay:${type}] unparsed format — restyling raw:`, allText.slice(0, 90));
       const firstEmbed = [...message.embeds.values()][0];
       if (firstEmbed) {
@@ -460,6 +461,75 @@ export function buildBot(db, cfg) {
     }
   };
 
+  // ------------------------------------------------- last-seen board mirror --
+  // His last-seen bot keeps ONE message and edits it forever (never resends).
+  // We keep our own message in the output channel and edit it in sync.
+  const mirrorHashes = new Map(); // their message id -> last content hash
+
+  const mirrorPayload = (message) => {
+    const embeds = [...message.embeds.values()];
+    const restyled = embeds.map((e) =>
+      new EmbedBuilder()
+        .setTitle(e.title ?? "Last Seen")
+        .setColor(0x5865f2)
+        .setDescription(e.description ?? "")
+        .addFields(...(e.fields ?? []).slice(0, 8).map((f) => ({ name: f.name, value: f.value, inline: f.inline ?? true })))
+        .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+        .setTimestamp()
+    );
+    if (restyled.length) return { embeds: restyled };
+    const text = (message.content ?? "").trim();
+    return text
+      ? { embeds: [new EmbedBuilder().setTitle("👀 Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "StealAnEgg · Last Seen Feed" }).setTimestamp()] }
+      : null;
+  };
+
+  const mirrorBoard = async (message) => {
+    const outId = cfg.lastseen_output_channel_id;
+    if (!outId) return;
+    const payload = mirrorPayload(message);
+    if (!payload) return;
+    const hash = JSON.stringify(payload).length + ":" + payload.embeds.map((e) => e.data.description?.length ?? 0).join(",");
+    if (mirrorHashes.get(message.id) === hash) return; // nothing changed
+    mirrorHashes.set(message.id, hash);
+
+    const ch = await client.channels.fetch(String(outId));
+    if (!ch) return;
+    const mineId = db.getSetting(`lastseen_mirror_${message.id}`);
+    if (mineId) {
+      try {
+        const mine = await ch.messages.fetch(mineId);
+        await mine.edit(payload);
+        return;
+      } catch { /* deleted — resend below */ }
+    }
+    const sent = await ch.send(payload);
+    db.setSetting(`lastseen_mirror_${message.id}`, sent.id);
+    console.log(`[mirror] board ${message.id} -> ${sent.id} created`);
+  };
+
+  client.on(Events.MessageUpdate, async (_oldMsg, newMsg) => {
+    try {
+      if (!cfg.lastseen_channel_id || newMsg.channel?.id !== String(cfg.lastseen_channel_id)) return;
+      if (newMsg.author?.id === client.user?.id) return;
+      // partial updates lack embeds/content — fetch the full message
+      const full = newMsg.partial ? await newMsg.fetch() : newMsg;
+      await mirrorBoard(full);
+      // silently keep spawn stats fresh too
+      for (const src of collectEmbedTexts(full)) {
+        const jobId = src.match(JOIN_LINK_RE)?.[2];
+        for (const spawn of parseBanners(src.replace(/\*/g, ""))) {
+          ingestSpawn(db, cfg, spawn, {
+            server_id: jobId ?? null, source: "lastseen",
+            spotter: full.author?.username || "feed", fanoutFn: fanOut,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[mirror] update failed:", e.message);
+    }
+  });
+
   client.on(Events.MessageCreate, async (message) => {
     // relay path first: inboxes may contain bot posts
     if (message.author?.id === client.user?.id) return; // never relay ourselves (loop guard)
@@ -468,7 +538,9 @@ export function buildBot(db, cfg) {
       return;
     }
     if (cfg.lastseen_channel_id && message.channel.id === String(cfg.lastseen_channel_id)) {
-      await relayInbox(message, "lastseen").catch((e) => console.error("[relay] failed:", e.message));
+      // board feed: stats ingest only — the mirror handles all output
+      await relayInbox(message, "lastseen", { silent: true }).catch((e) => console.error("[relay] failed:", e.message));
+      await mirrorBoard(message).catch((e) => console.error("[mirror] failed:", e.message));
       return;
     }
 
