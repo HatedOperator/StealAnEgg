@@ -637,7 +637,11 @@ export function buildBot(db, cfg) {
       console.log(`[mirror] no mirrorable content on ${message.id} (embeds=${message.embeds?.size ?? 0}, attachments=${atts.length})`);
       return;
     }
-    const snapshot = JSON.stringify(payload.embeds.map((e) => e.data));
+    // compare everything EXCEPT the timestamp, or every build looks "changed"
+    const snapshot = JSON.stringify(payload.embeds.map((e) => {
+      const { timestamp: _ts, ...rest } = e.data;
+      return rest;
+    }));
     if (mirrorHashes.get(message.id) === snapshot) return; // nothing changed
     mirrorHashes.set(message.id, snapshot);
 
