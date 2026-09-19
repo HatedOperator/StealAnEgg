@@ -36,6 +36,7 @@ export const DEFAULTS = {
   cycle_odds: { mythic: 0.2, secret: 0.01, eternal: 0.003, divine: 0.001, cosmic: 0.0002 },
   // -- Verification --
   verify_code_ttl_minutes: 30,
+  predict_role_id: 0, // 0 = /predict open to everyone; otherwise role-gated
   verify_poll_seconds: 15, // auto-scan pending codes this often
   // -- Scanner (member PC) --
   api_url: "http://127.0.0.1:8720",

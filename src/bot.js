@@ -11,7 +11,7 @@ import {
   Events, ChannelType, PermissionFlagsBits, MessageFlags,
 } from "discord.js";
 import { parseBanners, parseFeedFormat, RARITIES } from "./banner.js";
-import { nextReset, countdown, oddsText } from "./predictor.js";
+import { nextReset, oddsText } from "./predictor.js";
 import { resolveUsername, getHeadshotUrl } from "./roblox.js";
 import { checkCodeRow, ingestSpawn, fanOut, VerificationError } from "./service.js";
 import * as ocr from "./ocr.js";
@@ -217,6 +217,13 @@ export function buildBot(db, cfg) {
 
   async function handleCommand(i) {
     if (i.commandName === "predict") {
+      const gate = cfg.predict_role_id;
+      if (gate && !i.member?.roles?.cache?.has(String(gate))) {
+        return i.reply({
+          content: "Predictions are for prediction-whitelisted members only.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       const epoch = db.getSetting("cycle_epoch");
       const p = nextReset({ epoch: epoch ? Number(epoch) : null, cycleSeconds: cfg.cycle_seconds });
       const anchorNote = p.anchored ? "" : "\n*(calibrates after the first real capture)*";
@@ -226,7 +233,7 @@ export function buildBot(db, cfg) {
             .setTitle("⏱ Next egg reset")
             .setColor(0xfee75c)
             .setDescription(
-              `**Reset in ${countdown(p.nextResetIn)}** (cycle #${p.cycleNumber})${anchorNote}\n\n` +
+              `**Reset in <t:${Math.floor(Date.now() / 1000 + p.nextResetIn)}:R>** (cycle #${p.cycleNumber})${anchorNote}\n\n` +
               oddsText(cfg.cycle_odds)
             ),
         ],
