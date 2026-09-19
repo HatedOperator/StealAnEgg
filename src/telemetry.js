@@ -21,6 +21,8 @@ export function startTelemetry(client, db, cfg) {
   let spikeStreak = 0;
   let calmStreak = 0;
   let cooldownUntil = 0;
+  let lastPersist = 0;
+  let session = null; // {start, baseline, peak, peakTs} — real-event curve capture
 
   const poll = async () => {
     try {
@@ -87,11 +89,22 @@ export function startTelemetry(client, db, cfg) {
     if (!median) return;
 
     const ratio = players / median;
+
+    // history for future calibration: dense during events, sparse otherwise
+    if (ratio >= 1.2 || now - lastPersist > 600) {
+      db.conn.prepare("INSERT INTO player_history(ts, players) VALUES(?,?)").run(now, players);
+      lastPersist = now;
+    }
+    if (session) {
+      if (players > session.peak) session = { ...session, peak: players, peakTs: now };
+    }
+
     if (!abuseActive && now > cooldownUntil) {
       spikeStreak = ratio >= 1.35 ? spikeStreak + 1 : 0;
       if (spikeStreak >= 2) {
         abuseActive = true;
         spikeStreak = calmStreak = 0;
+        session = { start: now, baseline: median, peak: players, peakTs: now };
         await announceAbuse(true, players, median, servers);
       }
     } else if (abuseActive) {
@@ -100,6 +113,33 @@ export function startTelemetry(client, db, cfg) {
         abuseActive = false;
         cooldownUntil = now + 45 * 60;
         await announceAbuse(false, players, median, servers);
+        if (session) {
+          const mins = Math.round((now - session.start) / 60);
+          const ch = await abuseCh();
+          if (ch) {
+            await ch.send({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle("Session report")
+                  .setColor(0x5865f2)
+                  .setDescription(
+                    `**Duration:** ~${mins} min
+` +
+                    `**Peak players:** ${session.peak.toLocaleString("en-US")} ` +
+                    `(**${(session.peak / session.baseline).toFixed(1)}x** normal, ` +
+                    `hit <t:${Math.floor(session.peakTs)}:R>)
+` +
+                    `**Baseline:** ${session.baseline.toLocaleString("en-US")}`
+                  )
+                  .setFooter({ text: FOOTER })
+                  .setTimestamp(),
+              ],
+            });
+          }
+          db.setSetting("last_abuse_session", JSON.stringify({ ...session, end: now, mins }));
+          console.log(`[telemetry] session recorded: peak ${session.peak} (${(session.peak / session.baseline).toFixed(1)}x, ${mins}min)`);
+          session = null;
+        }
       }
     }
   }

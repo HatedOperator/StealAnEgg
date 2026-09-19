@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS player_history (
+    ts      REAL NOT NULL,
+    players INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_player_history_ts ON player_history(ts);
 `;
 
 export class DB {
