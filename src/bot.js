@@ -15,6 +15,7 @@ import { nextReset, oddsText } from "./predictor.js";
 import { resolveUsername, getHeadshotUrl } from "./roblox.js";
 import { checkCodeRow, ingestSpawn, fanOut, VerificationError } from "./service.js";
 import * as ocr from "./ocr.js";
+import { startTelemetry } from "./telemetry.js";
 
 const ID = {
   start: "eggv:start",
@@ -702,6 +703,7 @@ export function buildBot(db, cfg) {
     }
   };;
   client.pollLastSeen = pollLastSeen; // exposed for testing
+  startTelemetry(client, db, cfg); // update + admin-abuse watcher
   // (startup call + interval live in the ready handler)
 
   client.on(Events.MessageUpdate, async (_oldMsg, newMsg) => {
