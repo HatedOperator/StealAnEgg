@@ -1,6 +1,6 @@
 // Core logic shared by bot + API: verification checks, capture ingest, fan-out.
 import { rarityAtLeast } from "./banner.js";
-import { getProfile } from "./roblox.js";
+import { getProfile, getProfilePageBlurb } from "./roblox.js";
 import { anchorFromTimestamp } from "./predictor.js";
 
 export class VerificationError extends Error {}
@@ -18,11 +18,18 @@ export async function checkCodeRow(db, codeRow, ttlMinutes = 30) {
 
   const userId = codeRow.roblox_user_id;
   if (!userId) throw new VerificationError("No Roblox account attached — start verification again.");
+  const code = codeRow.code.toLowerCase();
+
+  // Source 1: users API description (cheap JSON — but can be stale/empty).
   const profile = await getProfile(userId);
-  const about = (profile.description || "").toLowerCase();
-  if (!about.includes(codeRow.code.toLowerCase())) {
-    // Roblox caches the profile description — right after saving, the API can
-    // still serve the old blurb. Callers should treat this as "keep waiting".
+  if ((profile.description || "").toLowerCase().includes(code)) {
+    db.completeCode(codeRow, userId);
+    return { roblox_user_id: userId, roblox_username: codeRow.roblox_username };
+  }
+
+  // Source 2: live profile page blurb (og:description).
+  const blurb = await getProfilePageBlurb(userId);
+  if (!blurb.toLowerCase().includes(code)) {
     throw new VerificationError("code-not-visible");
   }
   db.completeCode(codeRow, userId);

@@ -28,6 +28,23 @@ export async function getProfile(userId) {
   return jfetch(`https://users.roblox.com/v1/users/${userId}`); // includes .description
 }
 
+// The users API's description field can be stale or flat-out empty even when
+// the blurb is saved — the live profile page (og:description) carries the
+// real About text, appended after the boilerplate sentence.
+export async function getProfilePageBlurb(userId) {
+  try {
+    const res = await fetch(`https://www.roblox.com/users/${userId}/profile`, {
+      headers: { "User-Agent": "Mozilla/5.0 (steal-an-egg-notifier verification)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    return html.match(/property="og:description" content="([^"]*)"/)?.[1] || "";
+  } catch {
+    return "";
+  }
+}
+
 export async function getHeadshotUrl(userId) {
   try {
     const data = await jfetch(
