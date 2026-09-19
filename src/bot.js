@@ -10,7 +10,7 @@ import {
   ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, SlashCommandBuilder,
   Events, ChannelType, PermissionFlagsBits, MessageFlags,
 } from "discord.js";
-import { parseBanners } from "./banner.js";
+import { parseBanners, parseFeedFormat } from "./banner.js";
 import { nextReset, countdown, oddsText } from "./predictor.js";
 import { resolveUsername, getHeadshotUrl } from "./roblox.js";
 import { checkCodeRow, ingestSpawn, fanOut, VerificationError } from "./service.js";
@@ -192,6 +192,10 @@ export function buildBot(db, cfg) {
     }
     await ensurePanel();
     setInterval(pollPending, cfg.verify_poll_seconds * 1000);
+
+    // Poll the last-seen inbox (pollLastSeen defined near mirrorBoard below)
+    await pollLastSeen();
+    setInterval(pollLastSeen, 60_000);
   });
 
   client.on(Events.InteractionCreate, async (i) => {
@@ -412,21 +416,28 @@ export function buildBot(db, cfg) {
 
     let parsedAny = 0;
     let relayed = 0;
+    const trySpawn = async (spawn) => {
+      parsedAny++;
+      const rowId = ingestSpawn(db, cfg, spawn, {
+        server_id: jobId ?? null,
+        source: type === "lastseen" ? "lastseen" : "relay",
+        spotter: message.author.username || "feed",
+        fanoutFn: fanOut,
+      });
+      if (rowId !== null) {
+        relayed++;
+        console.log(`[relay:${type}] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
+        if (!silent) await postOurs(message, type, spawn, jobId);
+      }
+    };
     for (const src of sources) {
       const text = src.replace(/\*/g, "");
       for (const spawn of parseBanners(text)) {
-        parsedAny++;
-        const rowId = ingestSpawn(db, cfg, spawn, {
-          server_id: jobId ?? null,
-          source: type === "lastseen" ? "lastseen" : "relay",
-          spotter: message.author.username || "feed",
-          fanoutFn: fanOut,
-        });
-        if (rowId !== null) {
-          relayed++;
-          console.log(`[relay:${type}] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
-          if (!silent) await postOurs(message, type, spawn, jobId);
-        }
+        await trySpawn(spawn);
+      }
+      if (!parsedAny) {
+        const feedSpawn = parseFeedFormat(src);
+        if (feedSpawn) await trySpawn(feedSpawn);
       }
       if (parsedAny) break; // first source that parses cleanly is the canonical one
     }
@@ -437,7 +448,7 @@ export function buildBot(db, cfg) {
     if (!parsedAny) {
       // Unknown format: still relay like-for-like (re-styled) so nothing is lost.
       if (silent) return;
-      console.log(`[relay:${type}] unparsed format — restyling raw:`, allText.slice(0, 90));
+      console.log(`[relay:${type}] unparsed format — restyling raw:`, allText.slice(0, 400));
       const firstEmbed = [...message.embeds.values()][0];
       if (firstEmbed) {
         const outId = type === "lastseen" ? cfg.lastseen_output_channel_id : cfg.notifier_output_channel_id;
@@ -507,6 +518,25 @@ export function buildBot(db, cfg) {
     db.setSetting(`lastseen_mirror_${message.id}`, sent.id);
     console.log(`[mirror] board ${message.id} -> ${sent.id} created`);
   };
+
+  // Poll the last-seen inbox: his board is one message edited forever, so
+  // events alone are unreliable — scan on startup and every minute.
+  const pollLastSeen = async () => {
+    try {
+      if (!cfg.lastseen_channel_id) return;
+      const ch = await client.channels.fetch(String(cfg.lastseen_channel_id));
+      if (!ch?.messages) return;
+      const msgs = await ch.messages.fetch({ limit: 10 });
+      for (const m of [...msgs.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp)) {
+        if (m.author?.id === client.user?.id) continue;
+        await relayInbox(m, "lastseen", { silent: true });
+        await mirrorBoard(m);
+      }
+    } catch (e) {
+      console.error("[mirror] poll failed:", e.message);
+    }
+  };
+  client.pollLastSeen = pollLastSeen; // exposed for testing
 
   client.on(Events.MessageUpdate, async (_oldMsg, newMsg) => {
     try {

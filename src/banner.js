@@ -36,3 +36,15 @@ export function rarityAtLeast(rarity, minimum) {
   const b = RARITY_ORDER[minimum.toLowerCase()];
   return a !== undefined && b !== undefined && a >= b;
 }
+
+// Second feed style seen in the wild: line-based fields with custom emojis —
+//   "Egg: TRex"  /  "🦖Location: Prehistoric"  /  rarity word somewhere in text
+export function parseFeedFormat(text) {
+  const clean = text.replace(/[^\x00-\x7F]+/g, " ");
+  const egg = clean.match(/\bEgg:\s*([A-Za-z0-9][A-Za-z0-9'’\- ]*)/i)?.[1]?.trim();
+  const biome = clean.match(/\bLocation:\s*([A-Za-z0-9][A-Za-z0-9'’&\- ]*)/i)?.[1]?.trim();
+  if (!egg || !biome) return null;
+  const rarityHit = RARITIES.find((r) => new RegExp(`\\b${r}\\b`, "i").test(clean));
+  if (!rarityHit) return null;
+  return { egg: title(egg), rarity: rarityHit, biome: title(biome) };
+}
