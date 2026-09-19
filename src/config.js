@@ -36,7 +36,7 @@ export const DEFAULTS = {
   cycle_odds: { mythic: 0.2, secret: 0.01, eternal: 0.003, divine: 0.001, cosmic: 0.0002 },
   // -- Telemetry: Admin Abuse watcher (updates are handled manually) --
   admin_abuse_channel_id: "1544152542793965578",
-  admin_abuse_role: 0,          // role to ping when abuse goes live (0 = none)
+  admin_abuse_role: "1550745442545836053", // role pinged on abuse warning + live
   admin_abuse_day: 6,           // 0=Sun ... 6=Sat
   admin_abuse_utc_hour: 15,     // 15:00 UTC = 11 AM ET
   admin_abuse_warn_minutes: 15, // heads-up X minutes before
