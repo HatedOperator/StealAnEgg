@@ -34,12 +34,9 @@ export const DEFAULTS = {
   // -- Predictor --
   cycle_seconds: 300,
   cycle_odds: { mythic: 0.2, secret: 0.01, eternal: 0.003, divine: 0.001, cosmic: 0.0002 },
-  // -- Telemetry: Admin Abuse + Updates --
+  // -- Telemetry: Admin Abuse watcher (updates are handled manually) --
   admin_abuse_channel_id: "1544152542793965578",
-  updates_channel_id: "1546849903248936993",
   admin_abuse_role: 0,          // role to ping when abuse goes live (0 = none)
-  updates_role: 0,              // role to ping on updates/event changes (0 = none)
-  event_ids: ["1731613937834787497"], // roblox.com/events pages to watch
   admin_abuse_day: 6,           // 0=Sun ... 6=Sat
   admin_abuse_utc_hour: 15,     // 15:00 UTC = 11 AM ET
   admin_abuse_warn_minutes: 15, // heads-up X minutes before
