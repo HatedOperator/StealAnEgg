@@ -133,10 +133,10 @@ export function buildBot(db, cfg) {
 
   // -------------------------------------------------------------- panel --
 
-  const verificationModal = () =>
+  const verificationModal = (title = "Roblox Verification") =>
     new ModalBuilder()
       .setCustomId(ID.modal)
-      .setTitle("Roblox Verification")
+      .setTitle(title)
       .addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
@@ -156,7 +156,8 @@ export function buildBot(db, cfg) {
         .setDescription(
           "Link your Roblox account to get credit for every egg spawn your scanner catches.\n\n" +
           "**Click Verify Me** → type your Roblox username → confirm it's you → paste a short code into your profile's About. That's it.\n" +
-          "The bot re-checks automatically every 15 seconds — no commands needed."
+          "The bot re-checks automatically every 15 seconds — no commands needed.\n\n" +
+          "Already verified? Run it again any time to switch to a different Roblox account."
         ),
     ],
     components: [
@@ -250,10 +251,9 @@ export function buildBot(db, cfg) {
 
   async function handleButton(i) {
     if (i.customId === ID.start) {
-      if (db.getLink(i.user.id)) {
-        return i.reply({ content: "You're already verified ✅", flags: MessageFlags.Ephemeral });
-      }
-      return i.showModal(verificationModal());
+      // Verified members can re-verify — the new link simply overwrites the old one.
+      const linked = !!db.getLink(i.user.id);
+      return i.showModal(verificationModal(linked ? "Re-verify Roblox Account" : "Roblox Verification"));
     }
 
     if (i.customId === ID.yes) {
