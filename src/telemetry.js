@@ -112,6 +112,20 @@ export function startTelemetry(client, db, cfg) {
       ? `https://www.roblox.com/games/start?placeId=${cfg.place_id}&gameInstanceId=${busiest.id}`
       : GAME_URL(cfg.place_id);
     const roleId = cfg.admin_abuse_role || 0;
+
+    // the live post replaces the warning — delete it so the channel tells one story
+    if (live) {
+      const warnId = db.getSetting("abuse_warning_msg_id");
+      if (warnId) {
+        db.setSetting("abuse_warning_msg_id", "");
+        try {
+          const warn = await ch.messages.fetch(warnId);
+          await warn.delete();
+          console.log("[telemetry] warning deleted (replaced by LIVE)");
+        } catch { /* already gone */ }
+      }
+    }
+
     await ch.send({
       content: live && roleId ? `<@&${roleId}>` : "",
       embeds: [
@@ -125,8 +139,7 @@ export function startTelemetry(client, db, cfg) {
                 "• **Special admin events**\n" +
                 "• **Random rewards & surprises**\n" +
                 "• **Admin commands / chaos**\n" +
-                "• **Join before it ends**\n\n" +
-                `> [**CLICK TO JOIN THE GAME**](${join})`
+                "• **Join before it ends**"
               : `It's over — the update is about to drop. Next abuse lands next Saturday, warning ping comes first.`
           )
           .setFooter({ text: FOOTER })
@@ -158,16 +171,15 @@ export function startTelemetry(client, db, cfg) {
       const ch = await abuseCh();
       if (!ch) return;
       const roleId = cfg.admin_abuse_role || 0;
-      await ch.send({
+      const sent = await ch.send({
         content: roleId ? `<@&${roleId}>` : "",
         embeds: [
           new EmbedBuilder()
             .setTitle("Admin Abuse starting soon")
             .setColor(0xfee75c)
             .setDescription(
-              `The weekly Admin Abuse event typically kicks off around now.\n` +
-              `Rare eggs, boosted spawns — get in position.\n` +
-              `> [**CLICK TO JOIN THE GAME**](${GAME_URL(cfg.place_id)})`
+              "Admin Abuse is happening **VERY SOON** in Steal an Egg.\n" +
+              "Join up for chaos, special admin events, random rewards and things you normally won't see during regular gameplay."
             )
             .setFooter({ text: FOOTER })
             .setTimestamp(),
@@ -178,6 +190,7 @@ export function startTelemetry(client, db, cfg) {
           ),
         ],
       });
+      db.setSetting("abuse_warning_msg_id", sent.id); // deleted when LIVE fires
       console.log("[telemetry] weekly abuse warning sent");
     } catch (e) {
       console.error("[telemetry] warn:", e.message);
