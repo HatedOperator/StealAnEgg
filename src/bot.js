@@ -356,7 +356,7 @@ export function buildBot(db, cfg) {
 
   const stripEmojis = (t) =>
     (t ?? "")
-      .replace(/<:[A-Za-z0-9_]+:\d+>/g, "")                          // custom discord emojis
+      .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, "")                    // custom discord emojis (static + animated)
       .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "") // unicode emojis
       .replace(/[ \t]{2,}/g, " ")
       .trim();
@@ -591,12 +591,32 @@ export function buildBot(db, cfg) {
       try {
         const raw = await client.rest.get(`/channels/${message.channelId}/messages/${message.id}`);
         const texts = collectComponentText(raw.components);
-        const cleaned = texts.join("\n")
-          .replace(/^#+\s*/gm, "").replace(/^-#\s*/gm, "")
-          .split("\n")
-          .filter((l) => !/senz|add me to your server/i.test(l)) // drop his branding lines
-          .join("\n");
-        const body = stripEmojis(cleaned).slice(0, 4000);
+        // rebuild his layout cleanly: bold rarity section headers, one egg per
+        // line as "Name — time (· biome)", live <t:..:R> timestamps kept
+        const sections = [];
+        for (const t of texts) {
+          const lines = t.split("\n")
+            .map((l) => stripEmojis(l.replace(/^#+\s*/, "").replace(/^-#\s*/, "")).replace(/\s+/g, " ").trim())
+            .filter((l) => l && !/senz|add me to your server/i.test(l)); // drop his branding
+          if (!lines.length) continue;
+          const header = lines[0].toUpperCase();
+          const entries = lines.slice(1)
+            .map((l) => {
+              const idx = l.indexOf("—");
+              if (idx === -1) return l;
+              return `**${l.slice(0, idx).trim()}** — ${l.slice(idx + 1).trim()}`;
+            });
+          if (/last seen|active/i.test(header)) {
+            sections.push({ header, entries });
+          } else if (entries.length) {
+            sections.push({ header: "LAST SEEN", entries: [header, ...entries] });
+          }
+        }
+        const body = sections
+          .filter((s) => s.entries.length)
+          .map((s) => `**${s.header}**\n${s.entries.join("\n")}`)
+          .join("\n\n")
+          .slice(0, 4000);
         if (body) {
           const b = new EmbedBuilder()
             .setTitle("Last Seen")
