@@ -341,56 +341,134 @@ export function buildBot(db, cfg) {
   // ------------------------------------------- screenshot OCR fallback --
 
   // ------------------------------------------------- inbox relay watcher --
-  // An external notifier bot (invited into OUR guild, or a webhook feed)
-  // posts its pings into a hidden inbox channel. We parse them and re-emit
-  // through our own ping pipeline, in our design. Bots ARE read here on
-  // purpose — the inbox exists to receive bot posts.
+  // External notifier feeds land in hidden inbox channels. We parse them,
+  // ingest (dedupe + stats), and re-emit in OUR design into the matching
+  // output channel. Bots ARE read here on purpose — inboxes receive bot posts.
   const JOIN_LINK_RE = /roblox\.com\/games\/start\?placeId=(\d+)&gameInstanceId=([\w-]+)/i;
 
-  const relayInbox = (message) => {
-    const embeds = [...message.embeds.values()];
-    // parse each source separately (concatenating lets egg names smear across fields)
+  const RARITY_COLORS = {
+    common: 0x99aab5, uncommon: 0x57f287, rare: 0x3498db, epic: 0x9b59b6,
+    legendary: 0xf1c40f, mythic: 0xe67e22, secret: 0x2b2d31, eternal: 0xe91e8c,
+    divine: 0xffd700, cosmic: 0x00d4ff,
+  };
+
+  const collectEmbedTexts = (message) => {
     const sources = [];
-    for (const e of embeds) {
+    for (const e of [...message.embeds.values()]) {
       sources.push(e.description ?? "");
       for (const f of e.fields ?? []) sources.push(`${f.name} ${f.value}`);
       sources.push(e.title ?? "");
     }
     sources.push(message.content ?? "");
-    const allText = sources.join(" ").replace(/\*/g, "");
-    const link = allText.match(JOIN_LINK_RE);
-    const jobId = link?.[2];
+    return sources;
+  };
 
+  // preserve his extra intel (money, speed gates, mutations...) in our layout
+  const passthroughFields = (message) => {
+    const KNOWN = /egg|spawn|join|biome|server|link|rarity/i;
+    const out = [];
+    for (const e of [...message.embeds.values()]) {
+      for (const f of e.fields ?? []) {
+        if (KNOWN.test(f.name)) continue;
+        out.push({ name: f.name, value: f.value, inline: f.inline ?? true });
+      }
+    }
+    return out.slice(0, 8);
+  };
+
+  const postOurs = async (message, type, spawn, jobId) => {
+    const outId = type === "lastseen" ? cfg.lastseen_output_channel_id : cfg.notifier_output_channel_id;
+    if (!outId) return;
+    try {
+      const ch = await client.channels.fetch(String(outId));
+      if (!ch) return;
+      const color = RARITY_COLORS[spawn.rarity.toLowerCase()] ?? 0x9b59b6;
+      const join = jobId
+        ? `https://www.roblox.com/games/start?placeId=${cfg.place_id || "PLACE"}&gameInstanceId=${jobId}`
+        : null;
+      const isLastSeen = type === "lastseen";
+      const embed = new EmbedBuilder()
+        .setTitle(isLastSeen ? `👀 LAST SEEN — ${spawn.rarity} ${spawn.egg}` : `🥚 ${spawn.rarity} EGG IS LIVE — ${spawn.egg}`)
+        .setColor(color)
+        .setDescription(
+          `**${spawn.rarity} ${spawn.egg} Egg** — **${spawn.biome}**
+` +
+          (join ? `> 🔗 [**CLICK TO JOIN THE SERVER**](${join})` : "")
+        )
+        .addFields(...(passthroughFields(message).length ? passthroughFields(message) : [{ name: "​", value: "​" }]))
+        .setFooter({ text: isLastSeen ? "StealAnEgg · Last Seen Feed" : "StealAnEgg · Live Notifier" })
+        .setTimestamp();
+      const roleId = isLastSeen ? 0 : (cfg.ping_roles || {})[spawn.rarity.toLowerCase()] || 0;
+      await ch.send({ content: roleId ? `<@&${roleId}>` : "", embeds: [embed] });
+    } catch (e) {
+      console.error("[relay] post failed:", e.message);
+    }
+  };
+
+  const relayInbox = async (message, type) => {
+    const sources = collectEmbedTexts(message);
+    const allText = sources.join(" ").replace(/\*/g, "");
+    const jobId = allText.match(JOIN_LINK_RE)?.[2];
+
+    let parsedAny = 0;
     let relayed = 0;
     for (const src of sources) {
       const text = src.replace(/\*/g, "");
       for (const spawn of parseBanners(text)) {
+        parsedAny++;
         const rowId = ingestSpawn(db, cfg, spawn, {
           server_id: jobId ?? null,
-          source: "relay",
+          source: type === "lastseen" ? "lastseen" : "relay",
           spotter: message.author.username || "feed",
           fanoutFn: fanOut,
         });
         if (rowId !== null) {
           relayed++;
-          console.log(`[relay] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
+          console.log(`[relay:${type}] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
+          await postOurs(message, type, spawn, jobId);
         }
       }
-      if (relayed) break; // first source that parses cleanly is the canonical one
+      if (parsedAny) break; // first source that parses cleanly is the canonical one
     }
-    if (!relayed) {
-      console.log("[relay] inbox post had no parseable spawn:", allText.slice(0, 80));
+    if (parsedAny && !relayed) {
+      console.log(`[relay:${type}] duplicate — already posted, skipping`);
+      return;
+    }
+    if (!parsedAny) {
+      // Unknown format: still relay like-for-like (re-styled) so nothing is lost.
+      console.log(`[relay:${type}] unparsed format — restyling raw:`, allText.slice(0, 90));
+      const firstEmbed = [...message.embeds.values()][0];
+      if (firstEmbed) {
+        const outId = type === "lastseen" ? cfg.lastseen_output_channel_id : cfg.notifier_output_channel_id;
+        try {
+          const ch = outId && (await client.channels.fetch(String(outId)));
+          if (ch) {
+            await ch.send({
+              embeds: [new EmbedBuilder()
+                .setTitle(firstEmbed.title ?? "Feed update")
+                .setColor(type === "lastseen" ? 0x5865f2 : 0x9b59b6)
+                .setDescription(firstEmbed.description ?? "")
+                .addFields(...(firstEmbed.fields ?? []).slice(0, 8).map((f) => ({ name: f.name, value: f.value, inline: f.inline ?? true })))
+                .setFooter({ text: `StealAnEgg · ${type === "lastseen" ? "Last Seen" : "Live"} Feed` })
+                .setTimestamp()],
+            });
+          }
+        } catch (e) {
+          console.error("[relay] raw post failed:", e.message);
+        }
+      }
     }
   };
 
   client.on(Events.MessageCreate, async (message) => {
-    // relay path first: inbox may contain bot posts
+    // relay path first: inboxes may contain bot posts
+    if (message.author?.id === client.user?.id) return; // never relay ourselves (loop guard)
     if (cfg.inbox_channel_id && message.channel.id === String(cfg.inbox_channel_id)) {
-      try {
-        relayInbox(message);
-      } catch (e) {
-        console.error("[relay] failed:", e.message);
-      }
+      await relayInbox(message, "notifier").catch((e) => console.error("[relay] failed:", e.message));
+      return;
+    }
+    if (cfg.lastseen_channel_id && message.channel.id === String(cfg.lastseen_channel_id)) {
+      await relayInbox(message, "lastseen").catch((e) => console.error("[relay] failed:", e.message));
       return;
     }
 
