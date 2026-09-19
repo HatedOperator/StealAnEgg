@@ -352,7 +352,7 @@ export function buildBot(db, cfg) {
   // External notifier feeds land in hidden inbox channels. We parse them,
   // ingest (dedupe + stats), and re-emit in OUR design into the matching
   // output channel. Bots ARE read here on purpose — inboxes receive bot posts.
-  const JOIN_LINK_RE = /roblox\.com\/games\/start\?placeId=(\d+)&gameInstanceId=([\w-]+)/i;
+  const JOIN_LINK_RE = /(https:\/\/www\.roblox\.com\/games\/start\?placeId=\d+&(?:gameInstanceId|gameId)=[\w-]+)/i;
 
   const stripEmojis = (t) =>
     (t ?? "")
@@ -362,6 +362,19 @@ export function buildBot(db, cfg) {
       .trim();
 
   const headerImage = (e) => e?.thumbnail?.url || e?.image?.url || null;
+
+  // pull his data lines (Money / Speed / spawn time) out of description text
+  const intelFields = (text) => {
+    const t = text ?? "";
+    const out = [];
+    const money = t.match(/Money:\s*([^<\n]+)/i)?.[1]?.trim();
+    const speed = t.match(/Recommended Speed:\s*([^<\n]+)/i)?.[1]?.trim();
+    const ts = t.match(/<t:\d+:R>/)?.[0]; // discord relative timestamp renders live
+    if (money) out.push({ name: "Money", value: stripEmojis(money), inline: true });
+    if (speed) out.push({ name: "Speed Needed", value: stripEmojis(speed), inline: true });
+    if (ts) out.push({ name: "Spawned", value: ts, inline: true });
+    return out;
+  };
 
   const RARITY_COLORS = {
     common: 0x99aab5, uncommon: 0x57f287, rare: 0x3498db, epic: 0x9b59b6,
@@ -393,16 +406,16 @@ export function buildBot(db, cfg) {
     return out.slice(0, 8);
   };
 
-  const postOurs = async (message, type, spawn, jobId) => {
+  const postOurs = async (message, type, spawn, jobId, joinUrl = null) => {
     const outId = type === "lastseen" ? cfg.lastseen_output_channel_id : cfg.notifier_output_channel_id;
     if (!outId) return;
     try {
       const ch = await client.channels.fetch(String(outId));
       if (!ch) return;
       const color = RARITY_COLORS[spawn.rarity.toLowerCase()] ?? 0x9b59b6;
-      const join = jobId
-        ? `https://www.roblox.com/games/start?placeId=${cfg.place_id || "PLACE"}&gameInstanceId=${jobId}`
-        : null;
+      // prefer his exact link (gameId= style works too); else construct one
+      const join = joinUrl
+        ?? (jobId ? `https://www.roblox.com/games/start?placeId=${cfg.place_id || "PLACE"}&gameInstanceId=${jobId}` : null);
       const isLastSeen = type === "lastseen";
       const embed = new EmbedBuilder()
         .setTitle(isLastSeen ? `LAST SEEN — ${spawn.rarity} ${spawn.egg}` : `${spawn.rarity} EGG IS LIVE — ${spawn.egg}`)
@@ -412,7 +425,12 @@ export function buildBot(db, cfg) {
 ` +
           (join ? `> [**CLICK TO JOIN THE SERVER**](${join})` : "")
         )
-        .addFields(...(passthroughFields(message).length ? passthroughFields(message) : [{ name: "​", value: "​" }]))
+        .addFields(...(() => {
+          const intel = intelFields([...message.embeds.values()].map((e) => `${e.description ?? ""}\n${e.title ?? ""}`).join("\n") + " " + (message.content ?? ""));
+          const extra = passthroughFields(message);
+          const all = [...extra, ...intel];
+          return all.length ? all : [{ name: "​", value: "​" }];
+        })())
         .setFooter({ text: isLastSeen ? "StealAnEgg · Last Seen Feed" : "StealAnEgg · Live Notifier" })
         .setTimestamp();
       const roleId = isLastSeen ? 0 : (cfg.ping_roles || {})[spawn.rarity.toLowerCase()] || 0;
@@ -425,7 +443,9 @@ export function buildBot(db, cfg) {
   const relayInbox = async (message, type, { silent = false } = {}) => {
     const sources = collectEmbedTexts(message);
     const allText = sources.join(" ").replace(/\*/g, "");
-    const jobId = allText.match(JOIN_LINK_RE)?.[2];
+    const linkMatch = allText.match(JOIN_LINK_RE);
+    const jobId = linkMatch?.[1];
+    const joinUrl = linkMatch?.[0];
 
     let parsedAny = 0;
     let relayed = 0;
@@ -440,7 +460,7 @@ export function buildBot(db, cfg) {
       if (rowId !== null) {
         relayed++;
         console.log(`[relay:${type}] ${spawn.rarity} ${spawn.egg} (${spawn.biome})${jobId ? " +join link" : ""}`);
-        if (!silent) await postOurs(message, type, spawn, jobId);
+        if (!silent) await postOurs(message, type, spawn, jobId, joinUrl);
       }
     };
     for (const src of sources) {

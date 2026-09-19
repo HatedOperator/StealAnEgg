@@ -40,7 +40,10 @@ export function rarityAtLeast(rarity, minimum) {
 // Second feed style seen in the wild: line-based fields with custom emojis —
 //   "Egg: TRex"  /  "🦖Location: Prehistoric"  /  rarity word somewhere in text
 export function parseFeedFormat(text) {
-  const clean = text.replace(/[^\x00-\x7F]+/g, " ");
+  const clean = text
+    // expand custom emoji tags into their names: <:Secret_Egg:123> -> " Secret Egg "
+    .replace(/<:([A-Za-z0-9_]+):\d+>/g, (_m, name) => ` ${name.replace(/_/g, " ")} `)
+    .replace(/[^\x00-\x7F]+/g, " ");
   const egg = clean.match(/\bEgg:\s*([A-Za-z0-9][A-Za-z0-9'’\- ]*)/i)?.[1]?.trim();
   const biome = clean.match(/\bLocation:\s*([A-Za-z0-9][A-Za-z0-9'’&\- ]*)/i)?.[1]?.trim();
   if (!egg || !biome) return null;
