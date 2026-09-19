@@ -86,7 +86,7 @@ export async function fanOut(cfg, spawn, serverId, spotter, source) {
         title: `🥚 ${spawn.rarity} Egg — ${spawn.egg}`,
         description: desc,
         color: 0x9b59b6,
-        footer: { text: "steal-an-egg notifier" },
+        footer: { text: "Alydex Group's | Steal An Egg Events & Notifier API" },
       }],
     }),
     signal: AbortSignal.timeout(10000),

@@ -431,7 +431,7 @@ export function buildBot(db, cfg) {
           const all = [...extra, ...intel];
           return all.length ? all : [{ name: "​", value: "​" }];
         })())
-        .setFooter({ text: isLastSeen ? "StealAnEgg · Last Seen Feed" : "StealAnEgg · Live Notifier" })
+        .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
         .setTimestamp();
       const roleId = isLastSeen ? 0 : (cfg.ping_roles || {})[spawn.rarity.toLowerCase()] || 0;
       await ch.send({ content: roleId ? `<@&${roleId}>` : "", embeds: [embed] });
@@ -501,7 +501,7 @@ export function buildBot(db, cfg) {
                   .setColor(type === "lastseen" ? 0x5865f2 : 0x9b59b6)
                   .setDescription(stripEmojis(firstEmbed.description))
                   .addFields(...(firstEmbed.fields ?? []).slice(0, 8).map((f) => ({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true })))
-                  .setFooter({ text: `StealAnEgg · ${type === "lastseen" ? "Last Seen" : "Live"} Feed` })
+                  .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
                   .setTimestamp();
                 if (type === "lastseen") {
                   const img = headerImage(firstEmbed);
@@ -532,7 +532,7 @@ export function buildBot(db, cfg) {
         .setColor(0x5865f2)
         .setDescription(stripEmojis(e.description))
         .addFields(...(e.fields ?? []).slice(0, 8).map((f) => ({ name: stripEmojis(f.name) || "—", value: stripEmojis(f.value) || "—", inline: f.inline ?? true })))
-        .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+        .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
         .setTimestamp();
       const img = headerImage(e);
       if (img) b.setThumbnail(img);
@@ -548,7 +548,7 @@ export function buildBot(db, cfg) {
           .setTitle("Last Seen")
           .setColor(0x5865f2)
           .setImage(images[0].url)
-          .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+          .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
           .setTimestamp()],
       };
     }
@@ -556,7 +556,7 @@ export function buildBot(db, cfg) {
     if (restyled.length) return { embeds: restyled };
     const text = stripEmojis(message.content);
     return text
-      ? { embeds: [new EmbedBuilder().setTitle("Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "StealAnEgg · Last Seen Feed" }).setTimestamp()] }
+      ? { embeds: [new EmbedBuilder().setTitle("Last Seen").setColor(0x5865f2).setDescription(text).setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" }).setTimestamp()] }
       : null;
   };;
 
@@ -622,7 +622,7 @@ export function buildBot(db, cfg) {
             .setTitle("Last Seen")
             .setColor(0x5865f2)
             .setDescription(body)
-            .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+            .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" })
             .setTimestamp();
           const media = collectComponentMedia(raw.components)[0];
           if (media) b.setImage(media);
