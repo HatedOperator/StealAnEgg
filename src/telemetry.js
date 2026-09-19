@@ -116,13 +116,16 @@ export function startTelemetry(client, db, cfg) {
       content: live && roleId ? `<@&${roleId}>` : "",
       embeds: [
         new EmbedBuilder()
-          .setTitle(live ? "ADMIN ABUSE NOW" : "Admin Abuse has ended")
+          .setTitle(live ? "ADMIN ABUSE — LIVE NOW" : "Admin Abuse has ended")
           .setColor(live ? 0xed4245 : 0x99aab5)
           .setDescription(
             live
-              ? "**FREE RARE EGGS + SPEED BOOSTS ACTIVE**\n" +
-                "everyone is farming RIGHT NOW\n" +
-                "GO GO GO — don't get left out\n\n" +
+              ? "Admin Abuse is happening **RIGHT NOW** in Steal an Egg.\n" +
+                "Join up for chaos, special admin events, random rewards and things you normally won't see during regular gameplay.\n\n" +
+                "• **Special admin events**\n" +
+                "• **Random rewards & surprises**\n" +
+                "• **Admin commands / chaos**\n" +
+                "• **Join before it ends**\n\n" +
                 `> [**CLICK TO JOIN THE GAME**](${join})`
               : `It's over — the update is about to drop. Next abuse lands next Saturday, warning ping comes first.`
           )
