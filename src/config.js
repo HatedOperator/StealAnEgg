@@ -8,7 +8,8 @@ export const DEFAULTS = {
   bot_token: "",
   guild_id: 0,
   verified_role_id: 0,
-  verify_channel_id: "1550689778717036554", // verification panel + confirmations
+  verify_channel_id: "1550689778717036554", // verification panel lives here
+  announce_channel_id: "1550697264970862673", // ✅ verified announcements go here
   screenshot_channel_id: 0,
   notify_webhook_url: "",
   // -- Game --

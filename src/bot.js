@@ -44,8 +44,7 @@ export function buildBot(db, cfg) {
 
   // ------------------------------------------------------------ helpers --
 
-  const verifyChannel = async () => {
-    const id = cfg.verify_channel_id || cfg.screenshot_channel_id;
+  const fetchTextChannel = async (id) => {
     if (!id) return null;
     try {
       const ch = await client.channels.fetch(String(id));
@@ -54,6 +53,8 @@ export function buildBot(db, cfg) {
       return null;
     }
   };
+
+  const verifyChannel = () => fetchTextChannel(cfg.verify_channel_id);
 
   const grantRole = async (guild, discordId) => {
     if (!cfg.verified_role_id || !guild) return;
@@ -66,8 +67,8 @@ export function buildBot(db, cfg) {
   };
 
   const announceVerified = async (discordId, robloxUsername, robloxUserId) => {
-    const ch = await verifyChannel();
-    if (!ch) return;
+    const ch = (await fetchTextChannel(cfg.announce_channel_id)) ?? (await verifyChannel());
+    if (!ch) return console.warn("[verify] no announce channel configured");
     await ch.send({
       embeds: [
         new EmbedBuilder()
@@ -92,18 +93,7 @@ export function buildBot(db, cfg) {
     }
     if (interaction) {
       await interaction
-        .update({
-          content: "",
-          embeds: [
-            new EmbedBuilder()
-              .setTitle("✅ Verified!")
-              .setColor(0x57f287)
-              .setDescription(
-                `Linked as **${result.roblox_username}**. You can delete the code from your About now.`
-              ),
-          ],
-          components: [],
-        })
+        .update({ content: "✅ Successfully verified", embeds: [], components: [] })
         .catch(() => {});
     }
     await announceVerified(uid, result.roblox_username, result.roblox_user_id);
