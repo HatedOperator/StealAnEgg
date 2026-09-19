@@ -183,7 +183,16 @@ export function buildBot(db, cfg) {
 
   client.once(Events.ClientReady, async () => {
     console.log(`[bot] logged in as ${client.user.tag}`);
-    client.user.setPresence({ activities: [{ name: "ROBLOX" }], status: "online" });
+    client.user.setPresence({
+      status: "online",
+      activities: [{
+        name: "ROBLOX",
+        type: 0, // Playing
+        details: "Steal an Egg",
+        state: "In a Roblox experience",
+        timestamps: { start: Date.now() }, // live "elapsed" clock like the real client
+      }],
+    });
     if (cfg.guild_id) {
       const guild = client.guilds.cache.get(String(cfg.guild_id));
       if (guild) await guild.commands.set(commands);
