@@ -3,7 +3,7 @@
 // Total concurrent players spiking over a rolling baseline -> announce LIVE
 // with a join link; plus a scheduled pre-event warning (default Saturday
 // 15:00 UTC = 11 AM ET, configurable). Updates are handled manually.
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { listServers } from "./roblox.js";
 
 const FOOTER = "Alydex Group's | Steal An Egg Events & Notifier API";
@@ -132,6 +132,13 @@ export function startTelemetry(client, db, cfg) {
           .setFooter({ text: FOOTER })
           .setTimestamp(),
       ],
+      components: live
+        ? [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setURL(join).setLabel("JOIN GAME").setStyle(ButtonStyle.Danger)
+            ),
+          ]
+        : [],
     });
     console.log(`[telemetry] abuse ${live ? "LIVE" : "ended"} (${players} players, baseline ${median})`);
   }
@@ -164,6 +171,11 @@ export function startTelemetry(client, db, cfg) {
             )
             .setFooter({ text: FOOTER })
             .setTimestamp(),
+        ],
+        components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setURL(GAME_URL(cfg.place_id)).setLabel("JOIN GAME").setStyle(ButtonStyle.Danger)
+          ),
         ],
       });
       console.log("[telemetry] weekly abuse warning sent");
