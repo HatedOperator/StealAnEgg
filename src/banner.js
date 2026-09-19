@@ -3,7 +3,7 @@
 
 export const RARITIES = [
   "Common", "Uncommon", "Rare", "Epic", "Legendary",
-  "Mythic", "Secret", "Eternal", "Divine", "Cosmic",
+  "Mythic", "Secret", "Eternal", "Divine", "Cosmic", "Rift",
 ];
 
 export const RARITY_ORDER = Object.fromEntries(RARITIES.map((r, i) => [r.toLowerCase(), i]));

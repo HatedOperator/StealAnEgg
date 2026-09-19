@@ -379,7 +379,7 @@ export function buildBot(db, cfg) {
   const RARITY_COLORS = {
     common: 0x99aab5, uncommon: 0x57f287, rare: 0x3498db, epic: 0x9b59b6,
     legendary: 0xf1c40f, mythic: 0xe67e22, secret: 0x2b2d31, eternal: 0xe91e8c,
-    divine: 0xffd700, cosmic: 0x00d4ff,
+    divine: 0xffd700, cosmic: 0x00d4ff, rift: 0x7c3aed,
   };
 
   const collectEmbedTexts = (message) => {
@@ -560,10 +560,58 @@ export function buildBot(db, cfg) {
       : null;
   };;
 
+  // Components V2 boards (SenZ-style): all text lives in the component tree
+  // (type 17 containers / type 10 text displays), not in content or embeds.
+  const collectComponentText = (comps, out = []) => {
+    for (const c of comps ?? []) {
+      if (c.content) out.push(c.content);
+      if (c.components) collectComponentText(c.components, out);
+      if (c.items) collectComponentText(c.items, out);
+      if (c.accessory) collectComponentText([c.accessory], out);
+    }
+    return out;
+  };
+  const collectComponentMedia = (comps, out = []) => {
+    for (const c of comps ?? []) {
+      if (c.media?.url) out.push(c.media.url);
+      if (c.accessory?.media?.url) out.push(c.accessory.media.url);
+      if (c.url && /https?:\/\//.test(c.url) && !/discord\.com/.test(c.url)) out.push(c.url);
+      if (c.components) collectComponentMedia(c.components, out);
+      if (c.items) collectComponentMedia(c.items, out);
+    }
+    return out;
+  };
+
   const mirrorBoard = async (message) => {
     const outId = cfg.lastseen_output_channel_id;
     if (!outId) return;
-    const payload = mirrorPayload(message);
+    let payload = mirrorPayload(message);
+    if (!payload) {
+      // fall back to the raw component tree via REST
+      try {
+        const raw = await client.rest.get(`/channels/${message.channelId}/messages/${message.id}`);
+        const texts = collectComponentText(raw.components);
+        const cleaned = texts.join("\n")
+          .replace(/^#+\s*/gm, "").replace(/^-#\s*/gm, "")
+          .split("\n")
+          .filter((l) => !/senz|add me to your server/i.test(l)) // drop his branding lines
+          .join("\n");
+        const body = stripEmojis(cleaned).slice(0, 4000);
+        if (body) {
+          const b = new EmbedBuilder()
+            .setTitle("Last Seen")
+            .setColor(0x5865f2)
+            .setDescription(body)
+            .setFooter({ text: "StealAnEgg · Last Seen Feed" })
+            .setTimestamp();
+          const media = collectComponentMedia(raw.components)[0];
+          if (media) b.setImage(media);
+          payload = { embeds: [b] };
+        }
+      } catch (e) {
+        console.error("[mirror] raw component fetch failed:", e.message);
+      }
+    }
     if (!payload) {
       const atts = [...message.attachments.values()];
       console.log(`[mirror] no mirrorable content on ${message.id} (embeds=${message.embeds?.size ?? 0}, attachments=${atts.length})`);
