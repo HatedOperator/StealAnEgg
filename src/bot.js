@@ -34,7 +34,6 @@ export function buildBot(db, cfg) {
   process.on("unhandledRejection", (e) => console.error("[unhandledRejection]", e));
 
   const commands = [
-    new SlashCommandBuilder().setName("predict").setDescription("Next egg reset + rarity odds"),
     new SlashCommandBuilder().setName("spawns").setDescription("Recent confirmed spawns"),
     new SlashCommandBuilder()
       .setName("panel")
@@ -217,29 +216,6 @@ export function buildBot(db, cfg) {
   });
 
   async function handleCommand(i) {
-    if (i.commandName === "predict") {
-      const gate = cfg.predict_role_id;
-      if (gate && !i.member?.roles?.cache?.has(String(gate))) {
-        return i.reply({
-          content: "Predictions are for prediction-whitelisted members only.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      const epoch = db.getSetting("cycle_epoch");
-      const p = nextReset({ epoch: epoch ? Number(epoch) : null, cycleSeconds: cfg.cycle_seconds });
-      const anchorNote = p.anchored ? "" : "\n*(calibrates after the first real capture)*";
-      return i.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle("⏱ Next egg reset")
-            .setColor(0xfee75c)
-            .setDescription(
-              `**Reset in <t:${Math.floor(Date.now() / 1000 + p.nextResetIn)}:R>** (cycle #${p.cycleNumber})${anchorNote}\n\n` +
-              oddsText(cfg.cycle_odds)
-            ),
-        ],
-      });
-    }
     if (i.commandName === "spawns") {
       const rows = db.recentCaptures(10);
       if (!rows.length) return i.reply("No captures yet — be the first sensor!");
@@ -741,6 +717,62 @@ export function buildBot(db, cfg) {
     }
   });
 
+  // ------------------------------------------------------ -predict (stealth) --
+  // "-predict [egg]" in any channel: message deleted, outcome DMed.
+  const dmPredict = async (message) => {
+    const name = message.content.replace(/^-predict/i, "").trim();
+
+    const deny = (text) =>
+      message.author.send({ content: text }).catch(() => {
+        message.channel.send(`<@${message.author.id}> open your DMs — prediction result couldn't be delivered.`)
+          .then((m) => setTimeout(() => m.delete().catch(() => {}), 10_000))
+          .catch(() => {});
+      });
+
+    const gate = cfg.predict_role_id;
+    if (gate && !message.member?.roles?.cache?.has(String(gate))) {
+      return deny("Predictions are for prediction-whitelisted members only.");
+    }
+
+    const epoch = db.getSetting("cycle_epoch");
+    const p = nextReset({ epoch: epoch ? Number(epoch) : null, cycleSeconds: cfg.cycle_seconds });
+    const resetLine = `**Next reset in <t:${Math.floor(Date.now() / 1000 + p.nextResetIn)}:R>** (cycle #${p.cycleNumber})`;
+
+    // egg-specific stats from recorded sightings
+    let eggBlock = "";
+    if (name) {
+      const rows = db.conn
+        .prepare("SELECT * FROM captures WHERE lower(egg) LIKE ? ORDER BY id DESC LIMIT 25")
+        .all(`%${name.toLowerCase()}%`);
+      const day = db.conn
+        .prepare("SELECT COUNT(*) AS n FROM captures WHERE lower(egg) LIKE ? AND created_at > ?")
+        .get(`%${name.toLowerCase()}%`, Date.now() / 1000 - 86400);
+      if (rows.length) {
+        const last = rows[0];
+        eggBlock =
+          `\n\n**${last.egg}** (${last.rarity})\n` +
+          `Last seen <t:${Math.floor(last.created_at)}:R> in **${last.biome}**\n` +
+          `Sighted **${day.n}** time${day.n === 1 ? "" : "s"} in the last 24h`;
+      } else {
+        eggBlock = `\n\nNo recorded sightings of **${name}** yet.`;
+      }
+    }
+
+    try {
+      await message.author.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("Prediction")
+            .setColor(0xfee75c)
+            .setDescription(`${resetLine}${eggBlock}\n\n${oddsText(cfg.cycle_odds)}`)
+            .setFooter({ text: "Alydex Group's | Steal An Egg Events & Notifier API" }),
+        ],
+      });
+    } catch {
+      await deny(" "); // unreachable in practice; keeps flow symmetric
+    }
+  };
+
   client.on(Events.MessageCreate, async (message) => {
     // relay path first: inboxes may contain bot posts
     if (message.author?.id === client.user?.id) return; // never relay ourselves (loop guard)
@@ -756,6 +788,11 @@ export function buildBot(db, cfg) {
     }
 
     if (message.author.bot) return;
+    if (/^-predict\b/i.test(message.content.trim())) {
+      await message.delete().catch(() => {}); // vanish the command
+      await dmPredict(message).catch((e) => console.error("[predict] failed:", e.message));
+      return;
+    }
     if (!cfg.screenshot_channel_id || message.channel.id !== String(cfg.screenshot_channel_id)) return;
     for (const att of message.attachments.values()) {
       if (!(att.contentType || "").startsWith("image/")) continue;
