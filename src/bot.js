@@ -184,6 +184,7 @@ export function buildBot(db, cfg) {
 
   client.once(Events.ClientReady, async () => {
     console.log(`[bot] logged in as ${client.user.tag}`);
+    client.user.setPresence({ activities: [{ name: "ROBLOX" }], status: "online" });
     if (cfg.guild_id) {
       const guild = client.guilds.cache.get(String(cfg.guild_id));
       if (guild) await guild.commands.set(commands);
