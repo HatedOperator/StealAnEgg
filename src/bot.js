@@ -115,10 +115,10 @@ export function buildBot(db, cfg) {
       .setTitle("🥚 Almost there — add this code to your Roblox profile")
       .setColor(0x9b59b6)
       .setDescription(
-        `1. Go to **roblox.com** and log in as **${username}**\n` +
-        `2. **Settings → About** → paste this into your blurb:\n` +
-        "```\n" + code + "\n```\n" +
-        `3. Save — then either hit **I've Added It** below, or just wait: I re-check **every ${cfg.verify_poll_seconds}s** automatically.\n` +
+      `1. Go to **roblox.com** → your **profile** (or gear ⚙ → Settings) → **About**\n` +
+      `2. Edit the **description/blurb** and paste this code:\n` +
+      "```\n" + code + "\n```\n" +
+      `3. **Save** — Roblox may take a minute to show it (they cache profiles). Either hit **I've Added It**, or just wait: I re-check **every ${cfg.verify_poll_seconds}s** for 30 minutes and complete on my own.\n` +
         `_(Delete the code from your profile after — this message is only visible to you.)_`
       );
 
@@ -129,7 +129,13 @@ export function buildBot(db, cfg) {
         await verifySuccess(row, { discordId: row.discord_id });
         console.log(`[verify] auto-completed ${row.discord_id} -> ${row.roblox_username}`);
       } catch (e) {
-        if (e instanceof VerificationError) continue; // not there yet / expired
+        if (e instanceof VerificationError) {
+          if (e.message.includes("expired")) {
+            db.expireCode(row.code); // stop re-checking dead codes forever
+            console.log(`[verify] expired ${row.code} (${row.discord_id})`);
+          }
+          continue; // "code-not-visible" just means Roblox cache hasn't caught up
+        }
         console.error("[verify] poll error:", e.message);
       }
     }
@@ -281,22 +287,36 @@ export function buildBot(db, cfg) {
     if (i.customId === ID.done) {
       const row = db.pendingCode(i.user.id);
       if (!row) return i.update({ content: "Session expired — hit Verify Me again.", embeds: [], components: [] });
+      const retryRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(ID.done).setLabel("I've Added It — Check Again").setStyle(ButtonStyle.Success)
+      );
       try {
         await verifySuccess(row, { interaction: i });
       } catch (e) {
         if (!(e instanceof VerificationError)) throw e;
+        if (e.message === "code-not-visible") {
+          return i.update({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle("⏳ Not visible yet — hang tight")
+                .setColor(0xfee75c)
+                .setDescription(
+                  `Roblox caches profiles, so your About can take **a minute or two** to update on their side.\n\n` +
+                  `Keep \`${row.code}\` in your About — **no need to press anything**. I re-check every ${cfg.verify_poll_seconds}s and will complete automatically.` +
+                  (row.roblox_username ? `` : "")
+                ),
+            ],
+            components: [retryRow],
+          });
+        }
         return i.update({
           embeds: [
-            codeInstructionsEmbed(row.code, row.roblox_username).setDescription(
-              `❌ ${e.message}\n\n` +
-              codeInstructionsEmbed(row.code, row.roblox_username).data.description
-            ),
+            new EmbedBuilder()
+              .setTitle("❌ Not yet")
+              .setColor(0xed4245)
+              .setDescription(e.message),
           ],
-          components: [
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(ID.done).setLabel("I've Added It").setStyle(ButtonStyle.Success)
-            ),
-          ],
+          components: [retryRow],
         });
       }
       return;

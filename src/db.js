@@ -122,6 +122,10 @@ export class DB {
     return this.conn.prepare("SELECT * FROM codes WHERE status='pending'").all();
   }
 
+  expireCode(code) {
+    this.conn.prepare("UPDATE codes SET status='expired' WHERE code=?").run(code);
+  }
+
   completeCode(codeRow, robloxUserId) {
     this.conn
       .prepare(

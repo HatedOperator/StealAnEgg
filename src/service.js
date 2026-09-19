@@ -19,11 +19,11 @@ export async function checkCodeRow(db, codeRow, ttlMinutes = 30) {
   const userId = codeRow.roblox_user_id;
   if (!userId) throw new VerificationError("No Roblox account attached — start verification again.");
   const profile = await getProfile(userId);
-  const about = profile.description || "";
-  if (!about.includes(codeRow.code)) {
-    throw new VerificationError(
-      `Couldn't find code \`${codeRow.code}\` in ${codeRow.roblox_username}'s About. Save it at roblox.com → Settings → About, then hit Check.`
-    );
+  const about = (profile.description || "").toLowerCase();
+  if (!about.includes(codeRow.code.toLowerCase())) {
+    // Roblox caches the profile description — right after saving, the API can
+    // still serve the old blurb. Callers should treat this as "keep waiting".
+    throw new VerificationError("code-not-visible");
   }
   db.completeCode(codeRow, userId);
   return { roblox_user_id: userId, roblox_username: codeRow.roblox_username };
