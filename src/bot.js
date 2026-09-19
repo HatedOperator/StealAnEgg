@@ -643,7 +643,7 @@ export function buildBot(db, cfg) {
           // live-ticking freshness line at the bottom of the board (footers are
           // plain text and can't render timestamps)
           const last = sectionEmbeds[sectionEmbeds.length - 1];
-          last.data.description = `${last.data.description}\n\n**__LAST UPDATED <t:${updatedTs}:R>__**`.slice(0, 4000);
+          last.data.description = `${last.data.description}\n\n**__LAST UPDATED:__** <t:${updatedTs}:R>`.slice(0, 4000);
           payload = { embeds: sectionEmbeds };
         }
       } catch (e) {
