@@ -1,0 +1,35 @@
+{
+  "bot_token": "YOUR_DISCORD_BOT_TOKEN",
+  "guild_id": 123456789012345678,
+  "verified_role_id": 123456789012345678,
+  "screenshot_channel_id": 123456789012345678,
+  "notify_webhook_url": "https://discord.com/api/webhooks/...",
+
+  "place_id": 0000000000,
+
+  "api_host": "127.0.0.1",
+  "api_port": 8720,
+  "database_path": "eggwatch.db",
+
+  "min_rarity_to_ping": "Eternal",
+  "ping_roles": {
+    "secret": 0,
+    "eternal": 123456789012345678,
+    "divine": 123456789012345678,
+    "cosmic": 123456789012345678
+  },
+
+  "cycle_seconds": 300,
+  "cycle_odds": {
+    "mythic": 0.20,
+    "secret": 0.01,
+    "eternal": 0.003,
+    "divine": 0.001,
+    "cosmic": 0.0002
+  },
+
+  "tesseract_cmd": "C:/Program Files/Tesseract-OCR/tesseract.exe",
+
+  "api_url": "http://127.0.0.1:8720",
+  "roblox_username": "YourRobloxName"
+}
