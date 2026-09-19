@@ -154,9 +154,7 @@ export function buildBot(db, cfg) {
         .setTitle("🥚 Verify your Roblox account")
         .setColor(0x5865f2)
         .setDescription(
-          "Link your Roblox account to get credit for every egg spawn your scanner catches.\n\n" +
-          "**Click Verify Me** → type your Roblox username → confirm it's you → paste a short code into your profile's About. That's it.\n" +
-          "The bot re-checks automatically every 15 seconds — no commands needed.\n\n" +
+          "Link your ROBLOX Account, to be eligible for **Robux Reward Claims** & **Faster Giveaway Claims**!\n\n" +
           "Already verified? Run it again any time to switch to a different Roblox account."
         ),
     ],
