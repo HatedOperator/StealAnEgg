@@ -190,7 +190,11 @@ export function buildBot(db, cfg) {
     } else {
       await client.application.commands.set(commands);
     }
-    await ensurePanel();
+    try {
+      await ensurePanel();
+    } catch (e) {
+      console.error("[panel] startup failed (does not affect relays):", e.message);
+    }
     setInterval(pollPending, cfg.verify_poll_seconds * 1000);
 
     // Poll the last-seen inbox (pollLastSeen defined near mirrorBoard below)
@@ -542,20 +546,40 @@ export function buildBot(db, cfg) {
   // events alone are unreliable — scan on startup and every minute.
   const pollLastSeen = async () => {
     try {
-      if (!cfg.lastseen_channel_id) return;
+      if (!cfg.lastseen_channel_id) return console.log("[mirror] poll skipped: no lastseen_channel_id");
+      console.log(`[mirror] poll: scanning ${cfg.lastseen_channel_id}`);
       const ch = await client.channels.fetch(String(cfg.lastseen_channel_id));
-      if (!ch?.messages) return;
-      const msgs = await ch.messages.fetch({ limit: 10 });
-      for (const m of [...msgs.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp)) {
-        if (m.author?.id === client.user?.id) continue;
-        await relayInbox(m, "lastseen", { silent: true });
-        await mirrorBoard(m);
+      if (!ch) return console.log("[mirror] poll: channel fetch returned null");
+      if (!ch.messages) return console.log(`[mirror] poll: channel type ${ch.type} has no messages API`);
+
+      const targets = [ch];
+      // boards sometimes live in forum posts / threads — poll those too
+      try {
+        if (ch.threads) {
+          const active = await ch.threads.fetchActive();
+          for (const t of active.threads.values()) targets.push(t);
+          const archived = await ch.threads.fetchArchived();
+          for (const t of archived.threads.values()) targets.push(t);
+        }
+      } catch { /* not a forum */ }
+
+      let seen = 0;
+      for (const target of targets) {
+        const msgs = await target.messages.fetch({ limit: 10 });
+        for (const m of [...msgs.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp)) {
+          if (m.author?.id === client.user?.id) continue;
+          if (m.author?.bot) seen++;
+          await relayInbox(m, "lastseen", { silent: true });
+          await mirrorBoard(m);
+        }
       }
+      console.log(`[mirror] poll done: ${targets.length} target(s), ${seen} bot message(s)`);
     } catch (e) {
       console.error("[mirror] poll failed:", e.message);
     }
-  };
+  };;
   client.pollLastSeen = pollLastSeen; // exposed for testing
+  // (startup call + interval live in the ready handler)
 
   client.on(Events.MessageUpdate, async (_oldMsg, newMsg) => {
     try {
